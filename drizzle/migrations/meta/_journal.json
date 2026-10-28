@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1793129726760,
+      "tag": "0000_identity_roles_consent_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793129780167,
+      "tag": "0001_tighten_table_privileges",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793130302694,
+      "tag": "0002_phase3_orgs_seniors_observations",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793130400253,
+      "tag": "0003_fix_care_record_time_check",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793130460966,
+      "tag": "0004_fix_null_value_checks",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793132386724,
+      "tag": "0005_phase4_synthetic_datasets",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793133729301,
+      "tag": "0006_phase5_risk_assessments",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793135000000,
+      "tag": "0007_phase6_review_cases_and_tasks",
+      "breakpoints": true
+    }
+  ]
+}

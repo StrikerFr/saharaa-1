@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /seniors
+Disallow: /alerts
+Disallow: /follow-ups
+Disallow: /messages
+Disallow: /reports
+Disallow: /account
+Disallow: /admin
+Disallow: /reset-password
+
+Sitemap: https://little-sprout-starter.lovable.app/sitemap.xml
