@@ -247,7 +247,7 @@ function CareAssistantMessageContent({ content }: { content: string }) {
   }, [content]);
 
   return (
-    <div className="flex flex-col gap-2.5 text-card-foreground leading-relaxed text-xs sm:text-sm tabular-nums">
+    <div className="flex flex-col gap-2 text-card-foreground leading-relaxed text-xs sm:text-sm tabular-nums">
       {blocks.map((block, idx) => {
         if (block.type === "divider") {
           return <hr key={idx} className="my-2 border-border/60" />;
@@ -257,7 +257,7 @@ function CareAssistantMessageContent({ content }: { content: string }) {
           return (
             <div
               key={idx}
-              className="mt-3.5 first:mt-0 mb-1 flex items-center gap-2 border-b border-border/70 pb-1.5 text-xs font-semibold uppercase tracking-wider text-primary"
+              className="mt-2.5 first:mt-0 mb-1 flex items-center gap-2 border-b border-border/70 pb-1 text-xs font-semibold uppercase tracking-wider text-primary"
             >
               <span className="size-1.5 rounded-full bg-primary shrink-0" />
               <span>{block.headingText}</span>
@@ -267,7 +267,7 @@ function CareAssistantMessageContent({ content }: { content: string }) {
 
         if (block.type === "list" && block.items) {
           return (
-            <ul key={idx} className="my-1 flex flex-col gap-2 pl-0.5">
+            <ul key={idx} className="my-1 flex flex-col gap-1.5 pl-0.5">
               {block.items.map((item, itemIdx) => (
                 <li key={itemIdx} className="flex items-start gap-2.5 text-card-foreground/95">
                   <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/70" />
@@ -282,7 +282,7 @@ function CareAssistantMessageContent({ content }: { content: string }) {
           return (
             <div
               key={idx}
-              className="mt-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs sm:text-sm font-medium text-foreground flex items-start gap-2.5 shadow-2xs"
+              className="mt-2 rounded-xl border border-primary/20 bg-primary/5 p-2.5 text-xs sm:text-sm font-medium text-foreground flex items-start gap-2 shadow-2xs"
             >
               <Sparkles className="size-4 text-primary shrink-0 mt-0.5" />
               <div className="leading-relaxed flex-1">{renderFormattedInline(block.text)}</div>
@@ -311,6 +311,12 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
   const scrollRef = useRef<HTMLDivElement>(null);
   const fullScreenScrollRef = useRef<HTMLDivElement>(null);
 
+  // Targets for auto-scrolling to the top of newly arrived messages
+  const latestMsgRef = useRef<HTMLDivElement>(null);
+  const fullScreenLatestMsgRef = useRef<HTMLDivElement>(null);
+  const loadingRef = useRef<HTMLDivElement>(null);
+  const fullScreenLoadingRef = useRef<HTMLDivElement>(null);
+
   const cleanName = cleanSeniorDisplayName(seniorName);
   const askFn = useServerFn(askSeniorAI);
 
@@ -320,9 +326,10 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
 
   const mutation = useMutation({
     mutationFn: async (questionText: string) => {
-      const history = messages.slice(-6).map((m) => ({
+      // Pass at most 4 history messages and cap length at 1500 chars to avoid payload bloat
+      const history = messages.slice(-4).map((m) => ({
         role: m.role,
-        content: m.content,
+        content: m.content.slice(0, 1500),
       }));
       return await askFn({
         data: {
@@ -344,29 +351,59 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
       ]);
     },
     onError: (err: any) => {
+      let friendly = "Unable to retrieve care records at this moment. Please try asking a direct question.";
+      if (typeof err?.message === "string") {
+        if (err.message.includes('"code":') || err.message.startsWith("[")) {
+          friendly = "Unable to process the query. Please ask a direct question.";
+        } else {
+          friendly = err.message;
+        }
+      }
       setMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content:
-            err?.message ||
-            "Unable to retrieve care records at this moment. Please check your connection and try again.",
+          content: friendly,
           timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
         },
       ]);
     },
   });
 
-  // Scroll to bottom on updates
+  // Intelligent Scroll: Scroll to the TOP of the newly received message so user reads from the beginning
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-    if (fullScreenScrollRef.current) {
-      fullScreenScrollRef.current.scrollTop = fullScreenScrollRef.current.scrollHeight;
-    }
-  }, [messages, mutation.isPending, isFullscreen]);
+    if (messages.length === 0) return;
+    const timer = setTimeout(() => {
+      if (isFullscreen) {
+        if (fullScreenLatestMsgRef.current) {
+          fullScreenLatestMsgRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      } else {
+        if (latestMsgRef.current) {
+          latestMsgRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [messages, isFullscreen]);
+
+  // When query is pending, scroll loading indicator to top of view
+  useEffect(() => {
+    if (!mutation.isPending) return;
+    const timer = setTimeout(() => {
+      if (isFullscreen) {
+        if (fullScreenLoadingRef.current) {
+          fullScreenLoadingRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      } else {
+        if (loadingRef.current) {
+          loadingRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [mutation.isPending, isFullscreen]);
 
   // Handle ESC key and background scroll lock in fullscreen mode
   useEffect(() => {
@@ -476,46 +513,49 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
             {messages.length > 0 && (
               <div
                 ref={scrollRef}
-                className="flex min-h-[280px] max-h-[550px] flex-col gap-4 overflow-y-auto pr-1 text-sm"
+                className="flex min-h-[280px] max-h-[550px] flex-col gap-4 overflow-y-auto pr-1 text-sm justify-start"
               >
-                {messages.map((m) => (
-                  <div key={m.id}>
-                    {m.role === "user" ? (
-                      <div className="flex gap-2.5 justify-end items-start">
-                        <div className="flex flex-col items-end gap-1 max-w-[85%] sm:max-w-[75%]">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-muted-foreground">{m.timestamp}</span>
-                            <span className="text-[11px] font-medium text-foreground/80">You</span>
+                {messages.map((m, idx) => {
+                  const isLast = idx === messages.length - 1;
+                  return (
+                    <div key={m.id} ref={isLast ? latestMsgRef : undefined} className="w-full">
+                      {m.role === "user" ? (
+                        <div className="flex gap-2.5 justify-end items-start">
+                          <div className="flex flex-col items-end gap-1 max-w-[85%] sm:max-w-[75%]">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-muted-foreground">{m.timestamp}</span>
+                              <span className="text-[11px] font-medium text-foreground/80">You</span>
+                            </div>
+                            <div className="rounded-2xl bg-primary px-4 py-2 text-xs sm:text-sm font-medium text-primary-foreground shadow-xs">
+                              {m.content}
+                            </div>
                           </div>
-                          <div className="rounded-2xl bg-primary px-4 py-2.5 text-xs sm:text-sm font-medium text-primary-foreground shadow-xs">
-                            {m.content}
-                          </div>
-                        </div>
-                        <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground mt-1 shadow-2xs">
-                          <User className="size-3.5" />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2.5 justify-start items-start">
-                        <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary mt-1 shadow-2xs">
-                          <Sparkles className="size-3.5" />
-                        </div>
-                        <div className="flex flex-col gap-1 max-w-[95%] sm:max-w-[90%]">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-semibold text-primary">Sahaara Care Assistant</span>
-                            <span className="text-[10px] text-muted-foreground">{m.timestamp}</span>
-                          </div>
-                          <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">
-                            <CareAssistantMessageContent content={m.content} />
+                          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground mt-1 shadow-2xs">
+                            <User className="size-3.5" />
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                      ) : (
+                        <div className="flex gap-2.5 justify-start items-start">
+                          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary mt-1 shadow-2xs">
+                            <Sparkles className="size-3.5" />
+                          </div>
+                          <div className="flex flex-col gap-1 max-w-[95%] sm:max-w-[90%]">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-semibold text-primary">Sahaara Care Assistant</span>
+                              <span className="text-[10px] text-muted-foreground">{m.timestamp}</span>
+                            </div>
+                            <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">
+                              <CareAssistantMessageContent content={m.content} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
 
                 {mutation.isPending && (
-                  <div className="flex gap-2.5 items-start">
+                  <div ref={loadingRef} className="flex gap-2.5 items-start">
                     <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary mt-1">
                       <Sparkles className="size-3.5 animate-spin" />
                     </div>
@@ -638,9 +678,9 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
           {/* Fullscreen Scrollable Chat Body */}
           <div
             ref={fullScreenScrollRef}
-            className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 py-6 flex flex-col"
+            className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 py-6 flex flex-col justify-start"
           >
-            <div className="mx-auto w-full max-w-4xl flex-1 flex flex-col gap-6">
+            <div className="mx-auto w-full max-w-4xl flex flex-col gap-6 justify-start">
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center my-auto py-12 text-center max-w-md mx-auto">
                   <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-3 shadow-xs">
@@ -667,45 +707,48 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
                   </div>
                 </div>
               ) : (
-                messages.map((m) => (
-                  <div key={m.id} className="w-full">
-                    {m.role === "user" ? (
-                      <div className="flex gap-3 justify-end items-start">
-                        <div className="flex flex-col items-end gap-1 max-w-[85%] sm:max-w-[75%]">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-muted-foreground">{m.timestamp}</span>
-                            <span className="text-[11px] font-medium text-foreground/80">You</span>
+                messages.map((m, idx) => {
+                  const isLast = idx === messages.length - 1;
+                  return (
+                    <div key={m.id} ref={isLast ? fullScreenLatestMsgRef : undefined} className="w-full">
+                      {m.role === "user" ? (
+                        <div className="flex gap-3 justify-end items-start">
+                          <div className="flex flex-col items-end gap-1 max-w-[85%] sm:max-w-[75%]">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-muted-foreground">{m.timestamp}</span>
+                              <span className="text-[11px] font-medium text-foreground/80">You</span>
+                            </div>
+                            <div className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-xs">
+                              {m.content}
+                            </div>
                           </div>
-                          <div className="rounded-2xl bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-xs">
-                            {m.content}
-                          </div>
-                        </div>
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground mt-1 shadow-2xs">
-                          <User className="size-4" />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex gap-3 justify-start items-start">
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary mt-1 shadow-2xs">
-                          <Sparkles className="size-4" />
-                        </div>
-                        <div className="flex flex-col gap-1 w-full flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-primary">Sahaara Care Assistant</span>
-                            <span className="text-[10px] text-muted-foreground">{m.timestamp}</span>
-                          </div>
-                          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-                            <CareAssistantMessageContent content={m.content} />
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground mt-1 shadow-2xs">
+                            <User className="size-4" />
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                ))
+                      ) : (
+                        <div className="flex gap-3 justify-start items-start">
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary mt-1 shadow-2xs">
+                            <Sparkles className="size-4" />
+                          </div>
+                          <div className="flex flex-col gap-1 w-full flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-primary">Sahaara Care Assistant</span>
+                              <span className="text-[10px] text-muted-foreground">{m.timestamp}</span>
+                            </div>
+                            <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-sm">
+                              <CareAssistantMessageContent content={m.content} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
 
               {mutation.isPending && (
-                <div className="w-full flex gap-3 items-start">
+                <div ref={fullScreenLoadingRef} className="w-full flex gap-3 items-start">
                   <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary mt-1">
                     <Sparkles className="size-4 animate-spin" />
                   </div>
@@ -714,7 +757,7 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
                       <span className="text-xs font-semibold text-primary">Sahaara Care Assistant</span>
                       <span className="text-[10px] text-muted-foreground">Checking live records...</span>
                     </div>
-                    <div className="rounded-2xl bg-card p-6 border border-border flex flex-col gap-3">
+                    <div className="rounded-2xl bg-card p-5 border border-border flex flex-col gap-2.5">
                       <Skeleton className="h-4 w-full" />
                       <Skeleton className="h-4 w-4/5" />
                       <Skeleton className="h-4 w-3/5" />

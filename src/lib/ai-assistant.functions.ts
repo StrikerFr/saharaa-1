@@ -40,7 +40,7 @@ export const askSeniorAIInput = z
       .array(
         z.object({
           role: z.enum(["user", "assistant"]),
-          content: z.string().trim().max(1000),
+          content: z.string().trim().max(8000),
         }),
       )
       .max(10)
@@ -168,18 +168,18 @@ ACTIVE CARE TEAM ALERTS:
 ${alertsList.length ? alertsList.join("\n") : "• No active alerts. Routine indicators steady."}
 `.trim();
 
-    const systemPrompt = `You are Sahaara Care Assistant — a compassionate, articulate, and highly professional clinical care-coordination assistant for families and care teams.
+    const systemPrompt = `You are Sahaara Care Assistant — a concise, articulate, and professional clinical care-coordination assistant for families and care teams.
 You are communicating about ${cleanName}.
 
-CARE & SAFETY DIRECTIVES:
-1. Grounding: Answer strictly using ONLY the provided care records. NEVER invent or assume vital signs, medications, doses, timings, or events. If something was not recorded (e.g. no blood glucose logged today), state that clearly and calmly: "No blood glucose reading was recorded today."
-2. Boundaries: Do not provide medical diagnoses or recommend prescription changes.
-3. Tone: Warm, dignified, professional, clear, and reassuring. Address the senior respectfully as "${cleanName}". Never use robotic phrases like "Synthetic" or serial numbers.
-4. Structure:
-   - Provide an articulate executive summary sentence upfront.
-   - Use clear markdown sections with bold headers (e.g., "### Today's Completed Care", "### Upcoming Schedule Today", "### Health Readings & Vitals", "### Active Care Notices").
-   - Format routine items as clean bullet points with friendly 12-hour times (e.g. "8:00 AM", "1:00 PM").
-   - Conclude with a clear takeaway summary (e.g., "Overall, 4 of 10 routine items have been completed and 1 of 2 medications taken today.").`;
+CORE DIRECTIVES:
+1. FOCUS & CONCISENESS: Answer ONLY what was specifically asked. Keep answers direct, brief, and digestible (typically 2-4 focused bullet points or a single short paragraph, under 150 words).
+   - If asked about blood pressure or vitals: Mention ONLY the recorded readings (count, latest values, and whether they are steady). DO NOT list the daily meal, activity, or full routine schedule.
+   - If asked about medicines: State ONLY whether the scheduled medicines were taken, pending, or missed.
+   - If asked about today in general: Provide a brief 3-4 bullet point update covering key highlights.
+   - Do NOT write excessively long essays or dump unrelated sections.
+2. Grounding: Answer strictly using ONLY the provided care records. NEVER invent readings, dosages, or times. If unrecorded, state that in one brief sentence.
+3. Tone: Warm, professional, dignified, and clear. Address the senior respectfully as "${cleanName}".
+4. Boundaries: Never diagnose medical conditions or alter prescriptions.`;
 
     // 4. Call Groq if configured, else use grounded deterministic generator
     const totalRecords = observations.length + routineLogs.length;
@@ -220,7 +220,7 @@ CARE & SAFETY DIRECTIVES:
 
 /**
  * Deterministic, grounded fallback answers when external LLM provider is not configured.
- * Strictly adheres to real database records with high-tier professional formatting.
+ * Strictly adheres to real database records with concise, topic-focused formatting.
  */
 function generateGroundedFallbackAnswer({
   question,
@@ -241,142 +241,116 @@ function generateGroundedFallbackAnswer({
 }): string {
   const q = question.toLowerCase();
 
-  // 1. Question about today, daily schedule, routine, or medications
+  // 1. Specific Medication question
   if (
-    q.includes("today") ||
-    q.includes("routine") ||
-    q.includes("schedule") ||
     q.includes("medicine") ||
-    q.includes("medication")
+    q.includes("medication") ||
+    q.includes("pill") ||
+    q.includes("dose") ||
+    q.includes("aspirin") ||
+    q.includes("metoprolol")
   ) {
-    const completedItems = todaySchedule.filter((e) => e.status === "done");
-    const missedItems = todaySchedule.filter((e) => e.status === "missed");
-    const pendingItems = todaySchedule.filter((e) => e.status === "pending");
+    const meds = todaySchedule.filter((e) => e.item.category === "medication");
+    const takenMeds = meds.filter((e) => e.status === "done");
+    const missedMeds = meds.filter((e) => e.status === "missed");
+    const pendingMeds = meds.filter((e) => e.status === "pending");
 
-    const completedLines = completedItems.map((e) => {
-      const timeStr = formatTime12h(e.item.scheduled_time);
-      const noteStr = e.log?.note ? ` (${e.log.note})` : "";
-      return `- **${e.item.title}**: Completed at ${timeStr}${noteStr}.`;
-    });
+    const bullets: string[] = [];
 
-    const missedLines = missedItems.map((e) => {
-      const timeStr = formatTime12h(e.item.scheduled_time);
-      return `- **${e.item.title}**: Scheduled for ${timeStr} — marked as missed.`;
-    });
-
-    const pendingLines = pendingItems.map((e) => {
-      const timeStr = formatTime12h(e.item.scheduled_time);
-      const statusLabel = e.overdue ? " (overdue)" : "";
-      return `- **${e.item.title}**: Scheduled for ${timeStr}${statusLabel}.`;
-    });
-
-    const todayObs = observations.filter((o) => {
-      try {
-        return new Date(o.observed_at).toDateString() === new Date().toDateString();
-      } catch {
-        return false;
-      }
-    });
-
-    const vitalsLines = todayObs.map((o) => {
-      const label = OBSERVATION_TYPES[o.type]?.label ?? o.type;
-      const val = formatObservationValue(o);
-      const noteStr = o.note ? ` — ${o.note}` : "";
-      return `- **${label}**: Recorded at ${formatInZone(o.observed_at, timeZone)} was ${val}${noteStr}.`;
-    });
-
-    const sections: string[] = [];
-
-    // Header overview
-    sections.push(
-      `### Daily Care Overview for ${seniorName}\n\n${seniorName} is progressing through today's care schedule. Currently, **${todaySummary.done} of ${todaySummary.total} routine items** are completed, and **${todaySummary.medsDone} of ${todaySummary.medsTotal} scheduled medications** have been taken.`,
-    );
-
-    // Completed care
-    if (completedLines.length > 0) {
-      sections.push(`### Completed Care Today\n${completedLines.join("\n")}`);
-    }
-
-    // Missed items (if any)
-    if (missedLines.length > 0) {
-      sections.push(`### Missed or Delayed Items\n${missedLines.join("\n")}`);
-    }
-
-    // Upcoming schedule
-    if (pendingLines.length > 0) {
-      sections.push(`### Upcoming Schedule Today\n${pendingLines.join("\n")}`);
-    } else {
-      sections.push(`### Upcoming Schedule Today\nAll scheduled activities for today have been completed.`);
-    }
-
-    // Today's Vitals (if any)
-    if (vitalsLines.length > 0) {
-      sections.push(`### Today's Vital Observations\n${vitalsLines.join("\n")}`);
-    }
-
-    // Alert / Care team status
-    if (activeAlerts.length > 0) {
-      sections.push(
-        `### Care Team Status\nThere is currently ${activeAlerts.length} care team review case active regarding recent observations. Coordinators are actively reviewing these records.`,
+    if (takenMeds.length > 0) {
+      bullets.push(
+        ...takenMeds.map(
+          (m) =>
+            `- **${m.item.title}**: Marked as **taken** at ${formatTime12h(m.item.scheduled_time)}${m.log?.note ? ` (${m.log.note})` : ""}.`,
+        ),
       );
-    } else {
-      sections.push(`### Care Team Status\nNo active alerts are present today. Routine indicators remain steady.`);
+    }
+    if (missedMeds.length > 0) {
+      bullets.push(
+        ...missedMeds.map(
+          (m) => `- **${m.item.title}**: Scheduled for ${formatTime12h(m.item.scheduled_time)} — marked as **missed**.`,
+        ),
+      );
+    }
+    if (pendingMeds.length > 0) {
+      bullets.push(
+        ...pendingMeds.map(
+          (m) => `- **${m.item.title}**: Scheduled for ${formatTime12h(m.item.scheduled_time)} (**pending**).`,
+        ),
+      );
     }
 
-    // Takeaway
-    sections.push(
-      `Overall, ${todaySummary.done} of ${todaySummary.total} routine items have been completed and ${todaySummary.medsDone} of ${todaySummary.medsTotal} medications taken today.`,
+    if (bullets.length === 0) {
+      bullets.push("- No medications are scheduled in the routine for today.");
+    }
+
+    bullets.push(
+      `- **Adherence**: **${todaySummary.medsDone} of ${todaySummary.medsTotal}** scheduled medication doses taken today.`,
     );
 
-    return sections.join("\n\n");
+    return `### Medication Status for ${seniorName}\n\n${bullets.join("\n")}`;
   }
 
-  // 2. Question about past months, health trends, blood pressure, or vitals
+  // 2. Specific Blood Pressure / Vitals question
   if (
-    q.includes("month") ||
-    q.includes("health") ||
     q.includes("blood pressure") ||
     q.includes("bp") ||
-    q.includes("vitals") ||
-    q.includes("trend")
+    q.includes("pulse") ||
+    q.includes("heart rate") ||
+    q.includes("vital") ||
+    q.includes("reading")
   ) {
     const bps = observations.filter((o) => o.type === "blood_pressure");
     const hrs = observations.filter((o) => o.type === "heart_rate");
-    const weights = observations.filter((o) => o.type === "weight");
-    const notes = observations.filter((o) => o.type === "care_note");
 
-    const bpText = bps.length
-      ? `- **Blood Pressure**: ${bps.length} readings recorded in the past 30 days. The most recent reading was **${bps[0]!.value_numeric}/${bps[0]!.value_numeric_2} mmHg** on ${formatInZone(bps[0]!.observed_at, timeZone)}.`
-      : "- **Blood Pressure**: No blood pressure readings were recorded in the past 30 days.";
+    const bpLine = bps.length
+      ? `- **Blood Pressure**: Latest reading is **${bps[0]!.value_numeric}/${bps[0]!.value_numeric_2} mmHg** recorded on ${formatInZone(bps[0]!.observed_at, timeZone)} (${bps.length} readings in past 30 days).`
+      : "- **Blood Pressure**: No blood pressure readings recorded in the past 30 days.";
 
-    const hrText = hrs.length
-      ? `- **Heart Rate**: ${hrs.length} entries recorded. Latest reading was **${hrs[0]!.value_numeric} bpm** on ${formatInZone(hrs[0]!.observed_at, timeZone)}.`
+    const hrLine = hrs.length
+      ? `- **Heart Rate**: Latest reading was **${hrs[0]!.value_numeric} bpm** on ${formatInZone(hrs[0]!.observed_at, timeZone)}.`
       : "";
 
-    const weightText = weights.length
-      ? `- **Weight**: Most recent weight was **${weights[0]!.value_numeric} kg** on ${formatInZone(weights[0]!.observed_at, timeZone)}.`
-      : "";
-
-    const noteText = notes.length
-      ? `- **Caregiver Note**: "${notes[0]!.note}" (${formatInZone(notes[0]!.observed_at, timeZone)}).`
-      : "";
-
-    const sections = [
-      `### 30-Day Health & Vitals Summary for ${seniorName}`,
-      `Over the past month, **${observations.length} care observations** have been logged by coordinators and care partners. Health indicators have been tracked across cardiovascular, medication, and routine parameters.`,
-      `### Key Vital Signs`,
-      [bpText, hrText, weightText, noteText].filter(Boolean).join("\n"),
-      `### Clinical Review & Care Team Status`,
+    const alertLine =
       activeAlerts.length > 0
-        ? `There are currently ${activeAlerts.length} review alert(s) under evaluation by the care team to ensure vital stability.`
-        : `All routine vitals remain within established care thresholds with no unresolved clinical alerts.`,
-      `Overall, vital sign monitoring is active and care routine adherence is tracking at ${todaySummary.done} of ${todaySummary.total} items completed today.`,
-    ];
+        ? `- **Care Team Status**: There is an active review case regarding recent blood pressure variability under coordinator monitoring.`
+        : `- **Care Team Status**: Routine vitals remain steady with no unresolved clinical alerts.`;
 
-    return sections.join("\n\n");
+    return `### Vital Signs for ${seniorName}\n\n${[bpLine, hrLine, alertLine].filter(Boolean).join("\n")}`;
   }
 
-  // 3. Question about alerts, concerns, or follow-ups
+  // 3. Question about past month health / trends
+  if (q.includes("month") || q.includes("past") || q.includes("trend") || q.includes("health")) {
+    const bps = observations.filter((o) => o.type === "blood_pressure");
+    const hrs = observations.filter((o) => o.type === "heart_rate");
+    const weights = observations.filter((o) => o.type === "weight");
+
+    const bullets: string[] = [
+      `- **Recorded Observations**: ${observations.length} clinical observations logged over the past 30 days.`,
+    ];
+
+    if (bps.length > 0) {
+      bullets.push(
+        `- **Blood Pressure**: Latest reading is **${bps[0]!.value_numeric}/${bps[0]!.value_numeric_2} mmHg** (${formatInZone(bps[0]!.observed_at, timeZone)}).`,
+      );
+    }
+    if (hrs.length > 0) {
+      bullets.push(`- **Heart Rate**: Most recent was **${hrs[0]!.value_numeric} bpm**.`);
+    }
+    if (weights.length > 0) {
+      bullets.push(`- **Weight**: Last recorded at **${weights[0]!.value_numeric} kg**.`);
+    }
+
+    bullets.push(
+      activeAlerts.length > 0
+        ? `- **Care Review**: ${activeAlerts.length} review item(s) currently being followed up by coordinators.`
+        : `- **Care Review**: Overall health indicators remain steady with no active alerts.`,
+    );
+
+    return `### Health & Vitals Summary for ${seniorName}\n\n${bullets.join("\n")}`;
+  }
+
+  // 4. Question about alerts or concerns
   if (
     q.includes("alert") ||
     q.includes("concern") ||
@@ -385,48 +359,48 @@ function generateGroundedFallbackAnswer({
     q.includes("problem")
   ) {
     if (activeAlerts.length > 0) {
-      return `### Care Team Alert Status for ${seniorName}
+      return `### Care Team Notices for ${seniorName}
 
-There are currently **${activeAlerts.length} active review item(s)** under coordination:
-
+- **Active Alerts**: ${activeAlerts.length} review case(s) currently active.
 ${activeAlerts
   .map(
     (a: any) =>
-      `- **Priority ${a.priority_at_open.toUpperCase()} Alert**: Case status is currently **${a.status.replace(/_/g, " ")}** (opened on ${formatInZone(a.opened_at, timeZone)}).`,
+      `- Priority: **${a.priority_at_open.toUpperCase()}** • Status: **${a.status.replace(/_/g, " ")}** (opened on ${formatInZone(a.opened_at, timeZone)}).`,
   )
   .join("\n")}
-
-The care team is actively monitoring these records and follow-up tasks have been assigned to coordinators.`;
+- The care coordinator team is actively monitoring and managing these items.`;
     }
 
-    return `### Care Team Alert Status for ${seniorName}
+    return `### Care Team Notices for ${seniorName}
 
-There are currently **no active alerts or unaddressed clinical concerns** for ${seniorName}. All checked vitals and scheduled care routines are up to date.
-
-Overall, care indicators are steady and well-managed.`;
+- There are currently **no active alerts or unresolved clinical concerns** for ${seniorName}.
+- All checked vitals and routine items are up to date.`;
   }
 
-  // General fallback care summary
-  const latestObs = observations[0];
-  const latestText = latestObs
-    ? `- **Latest Observation**: ${OBSERVATION_TYPES[latestObs.type]?.label ?? latestObs.type} (${formatObservationValue(latestObs)}) recorded on ${formatInZone(latestObs.observed_at, timeZone)}.`
-    : "- **Latest Observation**: No recent clinical observations recorded.";
+  // 5. Default: concise Today's Overview
+  const missedItems = todaySchedule.filter((e) => e.status === "missed");
+  const nextPending = todaySchedule.find((e) => e.status === "pending");
 
-  return `### Care Coordination Overview for ${seniorName}
+  const bullets: string[] = [
+    `- **Routine Progress**: **${todaySummary.done} of ${todaySummary.total}** care activities completed today.`,
+    `- **Medications**: **${todaySummary.medsDone} of ${todaySummary.medsTotal}** scheduled doses taken.`,
+  ];
 
-${seniorName}'s care plan is active and monitored by coordinators and family members.
+  if (missedItems.length > 0) {
+    bullets.push(`- **Notable**: ${missedItems[0]!.item.title} was marked as **missed**.`);
+  }
 
-### Today's Schedule & Routine
-- **Daily Progress**: ${todaySummary.done} of ${todaySummary.total} scheduled care activities completed.
-- **Medication Adherence**: ${todaySummary.medsDone} of ${todaySummary.medsTotal} prescribed doses confirmed taken.
-${latestText}
+  if (nextPending) {
+    bullets.push(
+      `- **Next Up**: ${nextPending.item.title} scheduled for ${formatTime12h(nextPending.item.scheduled_time)}.`,
+    );
+  }
 
-### Care Team Status
-${
-  activeAlerts.length > 0
-    ? `There are ${activeAlerts.length} case(s) currently being monitored by coordinators.`
-    : `No unresolved clinical alerts are active. Routine well-being indicators remain steady.`
-}
+  bullets.push(
+    activeAlerts.length > 0
+      ? `- **Notice**: Active care alert under review by coordinator team.`
+      : `- **Status**: All routine care progressing normally.`,
+  );
 
-Overall, ${todaySummary.done} of ${todaySummary.total} routine items have been completed and ${todaySummary.medsDone} of ${todaySummary.medsTotal} medications taken today.`;
+  return `### Today's Update for ${seniorName}\n\n${bullets.join("\n")}`;
 }
