@@ -355,6 +355,13 @@ export const confirmCue = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => confirmCueInput.parse(d))
   .handler(async ({ data, context }) => {
+    // 1. Fetch cue to identify the linked senior
+    const { data: cueRow } = await from(context.supabase, "report_cues")
+      .select("senior_id")
+      .eq("id", data.cueId)
+      .maybeSingle();
+
+    // 2. Confirm the cue into a verified observation row (SECURITY DEFINER)
     const obs = await call(context.supabase, "confirm_report_cue", {
       _cue: data.cueId,
       _type: data.type,
@@ -367,7 +374,26 @@ export const confirmCue = createServerFn({ method: "POST" })
       _source: data.source,
       _description: data.description,
     });
-    return { observationId: obs as string };
+
+    // 3. Drive the unified downstream evaluation pipeline immediately
+    let evaluation = null;
+    const seniorId = (cueRow as { senior_id?: string } | null)?.senior_id;
+    if (seniorId) {
+      try {
+        const { evaluateSeniorRiskAndAlerts } = await import("@/lib/risk.functions");
+        evaluation = await evaluateSeniorRiskAndAlerts({
+          supabase: context.supabase,
+          seniorId,
+          userId: context.userId,
+          referenceTime: data.observedAt,
+          bypassThrottle: true,
+        });
+      } catch {
+        evaluation = null;
+      }
+    }
+
+    return { observationId: obs as string, evaluation };
   });
 
 /* ---------- Text-to-speech (confirmed content only) ---------- */

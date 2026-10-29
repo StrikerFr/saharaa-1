@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 
 import { Notice } from "@/components/shell/states";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ export function TaskForm({ seniorId, caseId }: { seniorId: string; caseId?: stri
   const [notes, setNotes] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [assignee, setAssignee] = useState<string>("unassigned");
+  const [familyVisible, setFamilyVisible] = useState(false);
 
   const assigneesQuery = useQuery({
     queryKey: ["org-assignees"],
@@ -53,6 +55,7 @@ export function TaskForm({ seniorId, caseId }: { seniorId: string; caseId?: stri
           caseId: caseId ?? null,
           assignee: assignee === "unassigned" ? null : assignee,
           dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+          familyVisible,
         },
       }),
     onSuccess: async () => {
@@ -61,9 +64,11 @@ export function TaskForm({ seniorId, caseId }: { seniorId: string; caseId?: stri
       setNotes("");
       setDueAt("");
       setAssignee("unassigned");
+      setFamilyVisible(false);
       await qc.invalidateQueries({ queryKey: ["review-case"] });
       await qc.invalidateQueries({ queryKey: ["follow-up-tasks"] });
       await qc.invalidateQueries({ queryKey: ["ops-summary"] });
+      await qc.invalidateQueries({ queryKey: ["family-dashboard-data"] });
     },
   });
 
@@ -127,6 +132,19 @@ export function TaskForm({ seniorId, caseId }: { seniorId: string; caseId?: stri
               value={dueAt}
               onChange={(e) => setDueAt(e.target.value)}
             />
+          </div>
+          <div className="flex items-center space-x-2 pt-1">
+            <Checkbox
+              id="family-visible"
+              checked={familyVisible}
+              onCheckedChange={(c) => setFamilyVisible(!!c)}
+            />
+            <Label
+              htmlFor="family-visible"
+              className="text-xs font-normal text-muted-foreground cursor-pointer"
+            >
+              Visible on Family Portal (authorized family can view & respond)
+            </Label>
           </div>
           {mut.isError && (
             <Notice tone="critical" title="Couldn't create the task.">

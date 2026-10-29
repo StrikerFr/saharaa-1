@@ -107,6 +107,7 @@ const createTaskInput = z
     caseId: z.string().uuid().nullable().default(null),
     assignee: z.string().uuid().nullable().default(null),
     dueAt: z.string().datetime({ offset: true }).nullable().default(null),
+    familyVisible: z.boolean().default(false),
   })
   .strict();
 
@@ -500,6 +501,12 @@ export const createFollowUpTask = createServerFn({ method: "POST" })
       _assignee: data.assignee,
       _due_at: data.dueAt,
     });
+    if (data.familyVisible && id) {
+      await (context.supabase as any)
+        .from("follow_up_tasks")
+        .update({ family_visible: true })
+        .eq("id", id);
+    }
     return { taskId: id };
   });
 

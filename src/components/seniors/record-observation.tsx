@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,12 +17,11 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
 import { selectCls } from "@/lib/form-styles";
+import { recordObservation } from "@/lib/observations.functions";
 import {
   buildObservation,
   ENTRY_SOURCES,
-  friendlyDbError,
   OBSERVATION_TYPES,
   SOURCES,
   toLocalInputValue,
@@ -52,26 +52,47 @@ export function RecordObservation({ seniorId }: { seniorId: string }) {
   const set = <K extends keyof ObservationDraft>(k: K, v: ObservationDraft[K]) =>
     setD((p) => ({ ...p, [k]: v }));
 
+  const recordFn = useServerFn(recordObservation);
   const save = useMutation({
     mutationFn: async (
       v: NonNullable<ReturnType<typeof buildObservation> & { ok: true }>["value"],
     ) => {
-      const { error } = await supabase
-        .from("observations")
-        .insert({ ...v, senior_id: seniorId, client_request_id: requestId.current });
-      // A duplicate key here means the same draft already saved (e.g. network retry) — treat as saved.
-      if (error && !(error.code === "23505" && error.message.includes("client_request_id")))
-        throw error;
+      return await recordFn({
+        data: {
+          seniorId,
+          type: v.type,
+          valueNumeric: v.value_numeric ?? null,
+          valueNumeric2: v.value_numeric_2 ?? null,
+          valueText: v.value_text ?? null,
+          unit: v.unit ?? null,
+          note: v.note ?? null,
+          observedAt: v.observed_at,
+          source: v.source,
+          clientRequestId: requestId.current,
+        },
+      });
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["observations", seniorId] });
       qc.invalidateQueries({ queryKey: ["latest", seniorId] });
-      toast.success("Observation saved");
+      qc.invalidateQueries({ queryKey: ["risk_assessments", seniorId] });
+      qc.invalidateQueries({ queryKey: ["alerts"] });
+      qc.invalidateQueries({ queryKey: ["ops-summary"] });
+      qc.invalidateQueries({ queryKey: ["active-review-cases-notifier"] });
+      qc.invalidateQueries({ queryKey: ["review-case"] });
+      qc.invalidateQueries({ queryKey: ["family-routine-summary", seniorId] });
+      qc.invalidateQueries({ queryKey: ["family-dashboard-data"] });
+
+      if (res.evaluation?.alert === "opened_or_updated") {
+        toast.warning("Observation saved — an alert was raised/updated for coordinator review");
+      } else {
+        toast.success("Observation saved");
+      }
       requestId.current = crypto.randomUUID();
       setD(fresh());
       setOpen(false);
     },
-    onError: (e: { code?: string }) => setServerError(friendlyDbError(e)),
+    onError: (e: any) => setServerError(e.message || "Failed to save observation"),
   });
 
   function submit(e: FormEvent) {
