@@ -42,6 +42,9 @@ export interface PersistInboundResult {
   messageId: string;
   conversationId: string;
   isDuplicate: boolean;
+  orgId?: string;
+  seniorId?: string | null;
+  identityId?: string;
 }
 
 /**
@@ -59,6 +62,9 @@ export async function persistInboundWhatsAppMessage(
         messageId: "test_msg_" + params.providerSid.slice(0, 16),
         conversationId: "test_conv_id",
         isDuplicate: false,
+        orgId: "7e570000-0000-4000-8000-0000000000a1",
+        seniorId: null,
+        identityId: "test_ident_id",
       };
     }
     throw new Error("Database service client is not configured on this server");
@@ -296,6 +302,9 @@ export async function persistInboundWhatsAppMessage(
     messageId,
     conversationId,
     isDuplicate: false,
+    orgId: targetOrgId,
+    seniorId: targetSeniorId,
+    identityId: targetIdentityId,
   };
 }
 
@@ -837,6 +846,16 @@ export async function sendOutboundWhatsAppMessage(
     }
   }
 
+  // Enforce message content and length limits
+  if (!contentSid) {
+    if (!bodyText || bodyText.trim().length === 0) {
+      throw new Error("Message body cannot be empty");
+    }
+    if (bodyText.length > 4096) {
+      throw new Error("Message body exceeds the maximum length of 4096 characters");
+    }
+  }
+
   // 3. Send message via Twilio API
   const twilioAccountSid = process.env["TWILIO_ACCOUNT_SID"];
   const twilioAuthToken = process.env["TWILIO_AUTH_TOKEN"];
@@ -851,16 +870,22 @@ export async function sendOutboundWhatsAppMessage(
   let actualBody = bodyText;
 
   if (injectedTwilioClient) {
-    const res = await injectedTwilioClient.messages.create({
+    const payload: { from: string; to: string; body?: string; contentSid?: string; contentVariables?: string } = {
       from: fromAddress,
       to: toAddress,
-      body: bodyText,
-    });
+    };
+    if (contentSid) {
+      payload.contentSid = contentSid;
+      if (contentVariables && Object.keys(contentVariables).length > 0) {
+        payload.contentVariables = JSON.stringify(contentVariables);
+      }
+    } else {
+      payload.body = bodyText;
+    }
+    const res = await injectedTwilioClient.messages.create(payload as never);
     twilioSid = res.sid;
     twilioStatus = res.status ?? "sent";
-    if (res.body) {
-      actualBody = res.body;
-    }
+    actualBody = contentSid && res.body ? res.body : bodyText;
   } else if (process.env["NODE_ENV"] === "test") {
     twilioSid = "SM_mock_outbound_" + Date.now().toString(36);
     twilioStatus = "sent";
@@ -871,8 +896,8 @@ export async function sendOutboundWhatsAppMessage(
     const twilioClient = twilio(twilioAccountSid, twilioAuthToken);
 
     try {
-      const activeContentSid = contentSid || process.env["TWILIO_CONTENT_SID"];
-      if (activeContentSid) {
+      if (contentSid) {
+        // Explicit template requested by coordinator (e.g. Appointment Reminder template action)
         const createPayload: {
           from: string;
           to: string;
@@ -881,7 +906,7 @@ export async function sendOutboundWhatsAppMessage(
         } = {
           from: fromAddress,
           to: toAddress,
-          contentSid: activeContentSid,
+          contentSid,
         };
         if (contentVariables && Object.keys(contentVariables).length > 0) {
           createPayload.contentVariables = JSON.stringify(contentVariables);
@@ -893,6 +918,7 @@ export async function sendOutboundWhatsAppMessage(
           actualBody = res.body;
         }
       } else {
+        // Free-form dynamic text message entered by coordinator
         const res = await twilioClient.messages.create({
           from: fromAddress,
           to: toAddress,
@@ -900,15 +926,13 @@ export async function sendOutboundWhatsAppMessage(
         });
         twilioSid = res.sid;
         twilioStatus = res.status ?? "sent";
-        if (res.body) {
-          actualBody = res.body;
-        }
+        actualBody = bodyText;
       }
     } catch (twilioErr: unknown) {
       const errObj = twilioErr as { code?: number; message?: string } | null;
       if (errObj?.code === 21654) {
         throw new Error(
-          "Twilio trial sender requires an approved Content Template SID (Error 21654). Please configure TWILIO_CONTENT_SID with your trial template SID in environment.",
+          "WhatsApp 24-hour service window is closed or template required (Twilio Error 21654). Free-form messages can only be sent within 24 hours of the contact's last WhatsApp message. Alternatively, send an approved Appointment Reminder template.",
         );
       }
       throw new Error(

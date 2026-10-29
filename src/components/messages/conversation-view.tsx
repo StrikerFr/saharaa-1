@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   AlertCircle,
   ArrowLeft,
+  Calendar,
   Check,
   CheckCheck,
   Clock,
@@ -115,6 +116,30 @@ export function ConversationView({
         err instanceof Error
           ? err.message
           : "Failed to send WhatsApp message. Please check your Twilio configuration.",
+      );
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleSendReminder = async () => {
+    if (!conversation || isSending) return;
+    setIsSending(true);
+    setSendError(null);
+    try {
+      await sendWhatsAppMessageFn({
+        data: {
+          conversationId: conversation.id,
+          bodyText: "Appointment Reminder",
+          contentSid: "HXfe5ab5f00277942d4d4200328b4d403c",
+        },
+      });
+      onRefresh();
+    } catch (err: unknown) {
+      setSendError(
+        err instanceof Error
+          ? err.message
+          : "Failed to send template reminder.",
       );
     } finally {
       setIsSending(false);
@@ -433,8 +458,19 @@ export function ConversationView({
             Send
           </Button>
         </form>
-        <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>Sends a real message to {contactName} on WhatsApp</span>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span>Sends custom WhatsApp text</span>
+            <button
+              type="button"
+              onClick={handleSendReminder}
+              disabled={isSending}
+              className="inline-flex items-center gap-1 rounded-md bg-secondary/80 px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-secondary transition-colors"
+              title="Send approved WhatsApp template outside 24h window"
+            >
+              <Calendar className="size-3" /> Send Appointment Template
+            </button>
+          </div>
           <span>{inputText.length}/4000</span>
         </div>
       </footer>

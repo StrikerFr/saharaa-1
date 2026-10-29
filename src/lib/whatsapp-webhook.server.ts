@@ -12,6 +12,7 @@ import {
 } from "./twilio.server";
 import { computePayloadChecksum } from "./whatsapp";
 import { persistInboundWhatsAppMessage } from "./whatsapp.server";
+import { processInboundWhatsAppMessageAI } from "./whatsapp-ai.server";
 
 const WEBHOOK_PATH = "/api/twilio/whatsapp";
 
@@ -179,7 +180,7 @@ export async function handleTwilioWhatsAppWebhook(request: Request): Promise<Res
 
   // 3. Persist Message Idempotently via Server-Only Database Service
   try {
-    await persistInboundWhatsAppMessage({
+    const result = await persistInboundWhatsAppMessage({
       providerSid,
       fromNumber: fromNorm.e164,
       toNumber: toNorm.e164,
@@ -188,6 +189,29 @@ export async function handleTwilioWhatsAppWebhook(request: Request): Promise<Res
       profileName: params["ProfileName"] || null,
       payloadChecksum,
     });
+
+    // 4. Clinical AI processing (Groq-driven intent routing, care routine logging, triage)
+    if (!result.isDuplicate) {
+      try {
+        await processInboundWhatsAppMessageAI({
+          messageId: result.messageId,
+          providerSid,
+          fromNumber: fromNorm.e164,
+          toNumber: toNorm.e164,
+          bodyText,
+          conversationId: result.conversationId,
+          orgId: result.orgId || "7e570000-0000-4000-8000-0000000000a1",
+          seniorId: result.seniorId ?? null,
+          identityId: result.identityId || "",
+        });
+      } catch (aiErr) {
+        // AI processing failure must never drop or fail the webhook persistence
+        console.error(
+          "Inbound WhatsApp AI processing error:",
+          aiErr instanceof Error ? aiErr.message : "AI Error",
+        );
+      }
+    }
 
     return new Response(EMPTY_TWIML_RESPONSE, {
       status: 200,
