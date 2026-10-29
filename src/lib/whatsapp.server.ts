@@ -2,6 +2,7 @@
 // Never exposes secrets or patient health data. All queries respect multi-tenant org isolation.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import twilio from "twilio";
 import type { Database, Json } from "@/integrations/supabase/types";
 import {
   maskPhoneNumber,
@@ -711,4 +712,772 @@ export async function markWhatsAppConversationReadForUser(
   }
 
   return { success: true };
+}
+
+export interface TwilioLikeClient {
+  messages: {
+    create: (params: {
+      from: string;
+      to: string;
+      body?: string;
+      contentSid?: string;
+      contentVariables?: string;
+    }) => Promise<{ sid: string; status?: string }>;
+    list?: (params?: { limit?: number }) => Promise<
+      Array<{
+        sid: string;
+        from: string;
+        to: string;
+        body: string | null;
+        direction: string;
+        status: string;
+        dateCreated?: Date | string | null;
+      }>
+    >;
+  };
+}
+
+export interface SendOutboundParams {
+  userId: string;
+  conversationId: string;
+  bodyText: string;
+  contentSid?: string | undefined;
+  contentVariables?: Record<string, string> | undefined;
+}
+
+/**
+ * Sends a real outbound WhatsApp message to an authorized recipient,
+ * persists it in whatsapp_messages, updates the conversation, and logs an audit transition.
+ */
+export async function sendOutboundWhatsAppMessage(
+  params: SendOutboundParams,
+  injectedAdmin?: SupabaseClient<Database> | null,
+  injectedTwilioClient?: TwilioLikeClient | null,
+): Promise<MessageItem> {
+  const admin = injectedAdmin ?? getSupabaseAdmin();
+  if (!admin) {
+    throw new Error("Database service client is not configured");
+  }
+
+  const { userId, conversationId, bodyText, contentSid, contentVariables } = params;
+
+  // 1. Verify caller membership and role
+  const { data: member } = await admin
+    .from("organization_members" as never)
+    .select("org_id" as never)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!member) {
+    throw new Error("Forbidden: User does not belong to an organization");
+  }
+  const userOrgId = (member as { org_id: string }).org_id;
+
+  const { data: roles } = await admin
+    .from("user_roles" as never)
+    .select("role" as never)
+    .eq("user_id", userId);
+  const roleList = (roles || []) as Array<{ role: string }>;
+  const isCareStaff = roleList.some((r) => r.role === "coordinator" || r.role === "admin");
+
+  // 2. Load conversation
+  const { data: convRow, error: cErr } = await admin
+    .from("whatsapp_conversations" as never)
+    .select("*, whatsapp_identities(*)")
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  if (cErr || !convRow) {
+    throw new Error("Conversation not found");
+  }
+
+  const conv = convRow as {
+    id: string;
+    org_id: string;
+    phone_number: string;
+    senior_id: string | null;
+    whatsapp_identity_id: string;
+    whatsapp_identities: {
+      id: string;
+      status: string;
+      consent_status: string;
+      phone_number: string;
+    } | null;
+  };
+
+  // Enforce tenant boundary
+  if (conv.org_id !== userOrgId) {
+    throw new Error("Forbidden: Cannot message a conversation outside your organization");
+  }
+
+  // If family user: ensure linked to senior
+  if (!isCareStaff) {
+    if (!conv.senior_id) {
+      throw new Error("Forbidden: Family members cannot message unlinked conversations");
+    }
+    const { data: famSeniors } = await admin
+      .from("senior_family_members" as never)
+      .select("id" as never)
+      .eq("user_id", userId)
+      .eq("senior_id", conv.senior_id)
+      .maybeSingle();
+
+    if (!famSeniors) {
+      throw new Error("Forbidden: You are not authorized for this senior");
+    }
+  }
+
+  // Care safety check: ensure identity consent not withdrawn or revoked
+  if (conv.whatsapp_identities) {
+    if (conv.whatsapp_identities.status === "revoked") {
+      throw new Error("Cannot message: This contact's WhatsApp identity has been revoked");
+    }
+    if (conv.whatsapp_identities.consent_status === "withdrawn") {
+      throw new Error("Cannot message: This contact has withdrawn WhatsApp communication consent");
+    }
+  }
+
+  // 3. Send message via Twilio API
+  const twilioAccountSid = process.env["TWILIO_ACCOUNT_SID"];
+  const twilioAuthToken = process.env["TWILIO_AUTH_TOKEN"];
+  const twilioFrom = process.env["TWILIO_WHATSAPP_NUMBER"] || "whatsapp:+17372508034";
+  const toAddress = conv.phone_number.startsWith("whatsapp:")
+    ? conv.phone_number
+    : `whatsapp:${conv.phone_number}`;
+  const fromAddress = twilioFrom.startsWith("whatsapp:") ? twilioFrom : `whatsapp:${twilioFrom}`;
+
+  let twilioSid: string;
+  let twilioStatus = "sent";
+
+  if (injectedTwilioClient) {
+    const res = await injectedTwilioClient.messages.create({
+      from: fromAddress,
+      to: toAddress,
+      body: bodyText,
+    });
+    twilioSid = res.sid;
+    twilioStatus = res.status ?? "sent";
+  } else if (process.env["NODE_ENV"] === "test") {
+    twilioSid = "SM_mock_outbound_" + Date.now().toString(36);
+    twilioStatus = "sent";
+  } else {
+    if (!twilioAccountSid || !twilioAuthToken) {
+      throw new Error("Twilio credentials are not configured on this server");
+    }
+    const twilioClient = twilio(twilioAccountSid, twilioAuthToken);
+
+    try {
+      const activeContentSid = contentSid || process.env["TWILIO_CONTENT_SID"];
+      if (activeContentSid) {
+        const res = await twilioClient.messages.create({
+          from: fromAddress,
+          to: toAddress,
+          contentSid: activeContentSid,
+          contentVariables: JSON.stringify(contentVariables || { 1: bodyText }),
+        });
+        twilioSid = res.sid;
+        twilioStatus = res.status ?? "sent";
+      } else {
+        const res = await twilioClient.messages.create({
+          from: fromAddress,
+          to: toAddress,
+          body: bodyText,
+        });
+        twilioSid = res.sid;
+        twilioStatus = res.status ?? "sent";
+      }
+    } catch (twilioErr: unknown) {
+      const errObj = twilioErr as { code?: number; message?: string } | null;
+      if (errObj?.code === 21654) {
+        throw new Error(
+          "Twilio trial sender requires an approved Content Template SID (Error 21654). Please configure TWILIO_CONTENT_SID with your trial template SID in environment.",
+        );
+      }
+      throw new Error(
+        `Twilio send failed (${errObj?.code || "unknown"}): ${errObj?.message || String(twilioErr)}`,
+      );
+    }
+  }
+
+  // 4. Persist outbound message
+  const { data: insertedMsg, error: msgErr } = await admin
+    .from("whatsapp_messages" as never)
+    .insert({
+      org_id: conv.org_id,
+      conversation_id: conv.id,
+      whatsapp_identity_id: conv.whatsapp_identity_id,
+      provider_message_sid: twilioSid,
+      direction: "outbound",
+      from_number: fromAddress.replace("whatsapp:", ""),
+      to_number: toAddress.replace("whatsapp:", ""),
+      message_type: "text",
+      body_text: bodyText,
+      media_meta: {},
+      provider_status: twilioStatus,
+      processing_status: "processed",
+    } as never)
+    .select("*" as never)
+    .single();
+
+  if (msgErr || !insertedMsg) {
+    throw new Error(`Failed to record outbound message: ${msgErr?.message}`);
+  }
+
+  const rawMsg = insertedMsg as {
+    id: string;
+    conversation_id: string;
+    provider_message_sid: string;
+    direction: "inbound" | "outbound";
+    from_number: string;
+    to_number: string;
+    message_type: string;
+    body_text: string | null;
+    media_meta: Record<string, Json>;
+    provider_status: string;
+    processing_status: string;
+    created_at: string;
+  };
+
+  // 5. Update conversation metadata
+  await admin
+    .from("whatsapp_conversations" as never)
+    .update({
+      last_message_at: new Date().toISOString(),
+      last_message_preview: bodyText.slice(0, 150),
+      updated_at: new Date().toISOString(),
+    } as never)
+    .eq("id", conv.id);
+
+  // 6. Audit Transition
+  await admin.from("whatsapp_audit_transitions" as never).insert({
+    message_id: rawMsg.id,
+    provider_message_sid: twilioSid,
+    from_status: "none",
+    to_status: twilioStatus,
+    triggered_by: "coordinator_outbound",
+    details: {
+      actor_id: userId,
+      to: toAddress,
+    },
+  } as never);
+
+  return {
+    id: rawMsg.id,
+    conversationId: rawMsg.conversation_id,
+    providerMessageSid: rawMsg.provider_message_sid,
+    direction: rawMsg.direction,
+    fromNumber: rawMsg.from_number,
+    toNumber: rawMsg.to_number,
+    messageType: rawMsg.message_type,
+    bodyText: rawMsg.body_text,
+    mediaMeta: (rawMsg.media_meta ?? {}) as Record<string, Json>,
+    providerStatus: rawMsg.provider_status,
+    processingStatus: rawMsg.processing_status,
+    createdAt: rawMsg.created_at,
+  };
+}
+
+/**
+ * Synchronizes recent messages directly from Twilio's REST API into the local database,
+ * making messaging reliable even when webhooks are pending or dropped.
+ */
+export async function syncTwilioWhatsAppMessages(
+  params: {
+    userId?: string | undefined;
+    limit?: number | undefined;
+  },
+  injectedAdmin?: SupabaseClient<Database> | null,
+  injectedTwilioClient?: TwilioLikeClient | null,
+): Promise<{ syncedCount: number; newMessages: number }> {
+  const admin = injectedAdmin ?? getSupabaseAdmin();
+  if (!admin) {
+    return { syncedCount: 0, newMessages: 0 };
+  }
+
+  const accountSid = process.env["TWILIO_ACCOUNT_SID"];
+  const authToken = process.env["TWILIO_AUTH_TOKEN"];
+  if (!injectedTwilioClient && (!accountSid || !authToken)) {
+    return { syncedCount: 0, newMessages: 0 };
+  }
+
+  const client = (injectedTwilioClient ??
+    (accountSid && authToken ? twilio(accountSid, authToken) : null)) as TwilioLikeClient | null;
+  if (!client) {
+    return { syncedCount: 0, newMessages: 0 };
+  }
+  const limit = params.limit ?? 30;
+
+  let messages: Array<{
+    sid: string;
+    from: string;
+    to: string;
+    body: string | null;
+    direction: string;
+    status: string;
+    dateCreated?: Date | string | null;
+  }> = [];
+  try {
+    if (client.messages.list) {
+      messages = await client.messages.list({ limit });
+    }
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.warn("Failed to fetch Twilio messages for sync:", errMsg);
+    return { syncedCount: 0, newMessages: 0 };
+  }
+
+  let newMessages = 0;
+  // Iterate chronologically (oldest first)
+  const sorted = [...messages].reverse();
+
+  for (const m of sorted) {
+    const sid = m.sid;
+    if (!sid) continue;
+
+    // Check if already in db
+    const { data: existing } = await admin
+      .from("whatsapp_messages" as never)
+      .select("id" as never)
+      .eq("provider_message_sid", sid)
+      .maybeSingle();
+
+    if (existing) continue;
+
+    const fromNum = (m.from || "").replace("whatsapp:", "");
+    const toNum = (m.to || "").replace("whatsapp:", "");
+    const isOutbound = m.direction === "outbound-api" || m.direction === "outbound-reply";
+
+    if (!isOutbound) {
+      try {
+        await persistInboundWhatsAppMessage(
+          {
+            providerSid: sid,
+            fromNumber: fromNum,
+            toNumber: toNum,
+            bodyText: m.body || "",
+          },
+          admin,
+        );
+        newMessages++;
+      } catch (e) {
+        console.warn("Failed to sync inbound message:", sid, e);
+      }
+    } else {
+      // Outbound sync
+      const recipientPhone = toNum;
+      // Find identity for recipient
+      const { data: idRow } = await admin
+        .from("whatsapp_identities" as never)
+        .select("id, org_id, senior_id" as never)
+        .eq("phone_number", recipientPhone)
+        .maybeSingle();
+
+      let targetOrgId = "7e570000-0000-4000-8000-0000000000a1";
+      let targetIdentId: string | null = null;
+
+      if (idRow) {
+        const idObj = idRow as { id: string; org_id: string; senior_id: string | null };
+        targetOrgId = idObj.org_id;
+        targetIdentId = idObj.id;
+      }
+
+      // Find conversation
+      let convId: string | null = null;
+      if (targetIdentId) {
+        const { data: convRow } = await admin
+          .from("whatsapp_conversations" as never)
+          .select("id" as never)
+          .eq("whatsapp_identity_id", targetIdentId)
+          .maybeSingle();
+
+        if (convRow) {
+          convId = (convRow as { id: string }).id;
+        }
+      }
+
+      if (convId && targetIdentId) {
+        const { data: insMsg } = await admin
+          .from("whatsapp_messages" as never)
+          .insert({
+            org_id: targetOrgId,
+            conversation_id: convId,
+            whatsapp_identity_id: targetIdentId,
+            provider_message_sid: sid,
+            direction: "outbound",
+            from_number: fromNum,
+            to_number: toNum,
+            message_type: "text",
+            body_text: m.body || "",
+            media_meta: {},
+            provider_status: m.status || "delivered",
+            processing_status: "processed",
+            created_at: m.dateCreated
+              ? new Date(m.dateCreated).toISOString()
+              : new Date().toISOString(),
+          } as never)
+          .select("id" as never)
+          .single();
+
+        if (insMsg) {
+          newMessages++;
+          await admin
+            .from("whatsapp_conversations" as never)
+            .update({
+              last_message_at: m.dateCreated
+                ? new Date(m.dateCreated).toISOString()
+                : new Date().toISOString(),
+              last_message_preview: (m.body || "").slice(0, 150),
+              updated_at: new Date().toISOString(),
+            } as never)
+            .eq("id", convId);
+        }
+      }
+    }
+  }
+
+  return { syncedCount: sorted.length, newMessages };
+}
+
+/**
+ * Retrieves the WhatsApp summary for a given senior:
+ * linked identities, primary conversation, and recent messages.
+ */
+export async function getSeniorWhatsAppSummaryForUser(
+  params: {
+    userId: string;
+    seniorId: string;
+  },
+  injectedAdmin?: SupabaseClient<Database> | null,
+): Promise<{
+  senior: { id: string; displayName: string; recordCode: string };
+  identities: Array<{
+    id: string;
+    phoneNumber: string;
+    maskedPhoneNumber: string;
+    displayName: string | null;
+    relationshipType: string;
+    status: string;
+    consentStatus: string;
+    verifiedAt: string | null;
+  }>;
+  conversation: ConversationSummary | null;
+  recentMessages: MessageItem[];
+}> {
+  const admin = injectedAdmin ?? getSupabaseAdmin();
+  if (!admin) {
+    throw new Error("Database service client is not configured");
+  }
+
+  const { userId, seniorId } = params;
+
+  // 1. Verify user organization
+  const { data: member } = await admin
+    .from("organization_members" as never)
+    .select("org_id" as never)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!member) {
+    throw new Error("Forbidden: User does not belong to an organization");
+  }
+  const userOrgId = (member as { org_id: string }).org_id;
+
+  // 2. Fetch senior
+  const { data: seniorRow, error: sErr } = await admin
+    .from("seniors" as never)
+    .select("id, org_id, display_name, record_code" as never)
+    .eq("id", seniorId)
+    .maybeSingle();
+
+  if (sErr || !seniorRow) {
+    throw new Error("Senior not found");
+  }
+  const senior = seniorRow as {
+    id: string;
+    org_id: string;
+    display_name: string;
+    record_code: string;
+  };
+
+  if (senior.org_id !== userOrgId) {
+    throw new Error("Forbidden: Senior belongs to another organization");
+  }
+
+  // 3. Fetch linked WhatsApp identities
+  const { data: idRows } = await admin
+    .from("whatsapp_identities" as never)
+    .select(
+      "id, phone_number, display_name, relationship_type, status, consent_status, verified_at" as never,
+    )
+    .eq("senior_id", seniorId)
+    .eq("org_id", userOrgId);
+
+  const rawIdentities = (idRows || []) as Array<{
+    id: string;
+    phone_number: string;
+    display_name: string | null;
+    relationship_type: string;
+    status: string;
+    consent_status: string;
+    verified_at: string | null;
+  }>;
+
+  const identities = rawIdentities.map((id) => ({
+    id: id.id,
+    phoneNumber: id.phone_number,
+    maskedPhoneNumber: maskPhoneNumber(id.phone_number),
+    displayName: id.display_name,
+    relationshipType: id.relationship_type,
+    status: id.status,
+    consentStatus: id.consent_status,
+    verifiedAt: id.verified_at,
+  }));
+
+  // 4. Fetch conversation if any
+  const { data: convRow } = await admin
+    .from("whatsapp_conversations" as never)
+    .select("*, whatsapp_identities(*), seniors(id, display_name, record_code)")
+    .eq("senior_id", seniorId)
+    .eq("org_id", userOrgId)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+
+  let conversation: ConversationSummary | null = null;
+  let recentMessages: MessageItem[] = [];
+
+  if (convRow) {
+    const c = convRow as {
+      id: string;
+      org_id: string;
+      phone_number: string;
+      status: string;
+      last_message_at: string | null;
+      last_message_preview: string | null;
+      unread_count: number | null;
+      whatsapp_identities: {
+        id: string;
+        display_name: string | null;
+        relationship_type: string;
+        status: string;
+        consent_status: string;
+        verified_at: string | null;
+      } | null;
+    };
+    conversation = {
+      id: c.id,
+      orgId: c.org_id,
+      phoneNumber: c.phone_number,
+      maskedPhoneNumber: maskPhoneNumber(c.phone_number),
+      status: c.status,
+      lastMessageAt: c.last_message_at,
+      lastMessagePreview: c.last_message_preview,
+      unreadCount: c.unread_count ?? 0,
+      identity: c.whatsapp_identities
+        ? {
+            id: c.whatsapp_identities.id,
+            displayName: c.whatsapp_identities.display_name,
+            relationshipType: c.whatsapp_identities.relationship_type,
+            status: c.whatsapp_identities.status,
+            consentStatus: c.whatsapp_identities.consent_status,
+            verifiedAt: c.whatsapp_identities.verified_at,
+          }
+        : null,
+      senior: {
+        id: senior.id,
+        displayName: senior.display_name,
+        recordCode: senior.record_code,
+      },
+    };
+
+    // Load recent 50 messages
+    const { data: msgRows } = await admin
+      .from("whatsapp_messages" as never)
+      .select("*")
+      .eq("conversation_id", c.id)
+      .order("created_at", { ascending: true })
+      .limit(50);
+
+    const rawMsgs = (msgRows || []) as Array<{
+      id: string;
+      conversation_id: string;
+      provider_message_sid: string;
+      direction: "inbound" | "outbound";
+      from_number: string;
+      to_number: string;
+      message_type: string;
+      body_text: string | null;
+      media_meta: Record<string, Json> | null;
+      provider_status: string;
+      processing_status: string;
+      created_at: string;
+    }>;
+
+    recentMessages = rawMsgs.map((m) => ({
+      id: m.id,
+      conversationId: m.conversation_id,
+      providerMessageSid: m.provider_message_sid,
+      direction: m.direction,
+      fromNumber: m.from_number,
+      toNumber: m.to_number,
+      messageType: m.message_type,
+      bodyText: m.body_text,
+      mediaMeta: (m.media_meta ?? {}) as Record<string, Json>,
+      providerStatus: m.provider_status,
+      processingStatus: m.processing_status,
+      createdAt: m.created_at,
+    }));
+  }
+
+  return {
+    senior: {
+      id: senior.id,
+      displayName: senior.display_name,
+      recordCode: senior.record_code,
+    },
+    identities,
+    conversation,
+    recentMessages,
+  };
+}
+
+/**
+ * Links a verified WhatsApp phone identity and conversation to a Senior.
+ * Authorized for coordinators and administrators.
+ */
+export async function linkSeniorWhatsAppIdentityForUser(
+  params: {
+    userId: string;
+    seniorId: string;
+    phoneNumber: string;
+    displayName: string;
+    relationshipType: string;
+  },
+  injectedAdmin?: SupabaseClient<Database> | null,
+): Promise<{ identityId: string; conversationId: string }> {
+  const admin = injectedAdmin ?? getSupabaseAdmin();
+  if (!admin) {
+    throw new Error("Database service client is not configured");
+  }
+
+  const { userId, seniorId, phoneNumber, displayName, relationshipType } = params;
+
+  // 1. Verify organization and role
+  const { data: member } = await admin
+    .from("organization_members" as never)
+    .select("org_id" as never)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!member) {
+    throw new Error("Forbidden: User does not belong to an organization");
+  }
+  const userOrgId = (member as { org_id: string }).org_id;
+
+  const { data: roles } = await admin
+    .from("user_roles" as never)
+    .select("role" as never)
+    .eq("user_id", userId);
+  const roleList = (roles || []) as Array<{ role: string }>;
+  const isCareStaff = roleList.some((r) => r.role === "coordinator" || r.role === "admin");
+
+  if (!isCareStaff) {
+    throw new Error("Forbidden: Only coordinators and administrators can link WhatsApp numbers");
+  }
+
+  // 2. Verify senior exists in org
+  const { data: seniorRow } = await admin
+    .from("seniors" as never)
+    .select("id, org_id" as never)
+    .eq("id", seniorId)
+    .maybeSingle();
+
+  if (!seniorRow || (seniorRow as { org_id: string }).org_id !== userOrgId) {
+    throw new Error("Senior not found in your organization");
+  }
+
+  // 3. Check for existing identity
+  const { data: existingIdent } = await admin
+    .from("whatsapp_identities" as never)
+    .select("id" as never)
+    .eq("phone_number", phoneNumber)
+    .eq("org_id", userOrgId)
+    .maybeSingle();
+
+  let identityId: string;
+  if (existingIdent) {
+    identityId = (existingIdent as { id: string }).id;
+    await admin
+      .from("whatsapp_identities" as never)
+      .update({
+        senior_id: seniorId,
+        display_name: displayName,
+        relationship_type: relationshipType,
+        status: "active",
+        consent_status: "granted",
+        verified_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", identityId);
+  } else {
+    const { data: newIdent, error: idErr } = await admin
+      .from("whatsapp_identities" as never)
+      .insert({
+        org_id: userOrgId,
+        phone_number: phoneNumber,
+        senior_id: seniorId,
+        display_name: displayName,
+        relationship_type: relationshipType,
+        status: "active",
+        consent_status: "granted",
+        verification_method: "coordinator_manual",
+        verified_at: new Date().toISOString(),
+      } as never)
+      .select("id" as never)
+      .single();
+
+    if (idErr || !newIdent) {
+      throw new Error(`Failed to create WhatsApp identity: ${idErr?.message}`);
+    }
+    identityId = (newIdent as { id: string }).id;
+  }
+
+  // 4. Find or create conversation
+  const { data: existingConv } = await admin
+    .from("whatsapp_conversations" as never)
+    .select("id" as never)
+    .eq("whatsapp_identity_id", identityId)
+    .maybeSingle();
+
+  let conversationId: string;
+  if (existingConv) {
+    conversationId = (existingConv as { id: string }).id;
+    await admin
+      .from("whatsapp_conversations" as never)
+      .update({
+        senior_id: seniorId,
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", conversationId);
+  } else {
+    const { data: newConv, error: cErr } = await admin
+      .from("whatsapp_conversations" as never)
+      .insert({
+        org_id: userOrgId,
+        whatsapp_identity_id: identityId,
+        senior_id: seniorId,
+        phone_number: phoneNumber,
+        status: "active",
+        unread_count: 0,
+      } as never)
+      .select("id" as never)
+      .single();
+
+    if (cErr || !newConv) {
+      throw new Error(`Failed to create conversation: ${cErr?.message}`);
+    }
+    conversationId = (newConv as { id: string }).id;
+  }
+
+  return { identityId, conversationId };
 }

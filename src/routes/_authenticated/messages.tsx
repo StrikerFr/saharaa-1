@@ -14,6 +14,7 @@ import {
   getWhatsAppConversationDetail,
   listWhatsAppConversations,
   markWhatsAppConversationRead,
+  syncWhatsAppMessages,
 } from "@/lib/whatsapp.functions";
 import type { ConversationFilterType } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
@@ -60,11 +61,30 @@ function MessagesInbox() {
   const listConversationsFn = useServerFn(listWhatsAppConversations);
   const getConversationDetailFn = useServerFn(getWhatsAppConversationDetail);
   const markReadFn = useServerFn(markWhatsAppConversationRead);
+  const syncMessagesFn = useServerFn(syncWhatsAppMessages);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<ConversationFilterType>("all");
   const [search, setSearch] = useState("");
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
+
+  // Sync with Twilio once on mount in background to pull any new WhatsApp messages
+  useEffect(() => {
+    syncMessagesFn({ data: { limit: 25 } })
+      .then((res) => {
+        if (res && res.newMessages > 0) {
+          queryClient.invalidateQueries({ queryKey: ["whatsapp-conversations"] });
+          if (selectedId) {
+            queryClient.invalidateQueries({
+              queryKey: ["whatsapp-conversation-detail", selectedId],
+            });
+          }
+        }
+      })
+      .catch(() => {
+        // Non-blocking sync failure
+      });
+  }, [syncMessagesFn, queryClient, selectedId]);
 
   // 1. Fetch Conversations with bounded 5s polling
   const conversationsQuery = useQuery({

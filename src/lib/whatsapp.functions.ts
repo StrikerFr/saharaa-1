@@ -5,13 +5,21 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   getConversationDetailInput,
+  getSeniorWhatsAppSummaryInput,
+  linkSeniorWhatsAppIdentityInput,
   listConversationsInput,
   markConversationReadInput,
+  sendWhatsAppMessageInput,
+  syncWhatsAppMessagesInput,
 } from "./whatsapp";
 import {
+  getSeniorWhatsAppSummaryForUser,
   getWhatsAppConversationDetailForUser,
+  linkSeniorWhatsAppIdentityForUser,
   listWhatsAppConversationsForUser,
   markWhatsAppConversationReadForUser,
+  sendOutboundWhatsAppMessage,
+  syncTwilioWhatsAppMessages,
 } from "./whatsapp.server";
 
 /**
@@ -58,3 +66,60 @@ export const markWhatsAppConversationRead = createServerFn({ method: "POST" })
     });
   });
 
+/**
+ * Sends a real outbound WhatsApp message to the contact in a conversation.
+ */
+export const sendWhatsAppMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => sendWhatsAppMessageInput.parse(d))
+  .handler(async ({ data, context }) => {
+    return await sendOutboundWhatsAppMessage({
+      userId: context.userId,
+      conversationId: data.conversationId,
+      bodyText: data.bodyText,
+      contentSid: data.contentSid,
+      contentVariables: data.contentVariables,
+    });
+  });
+
+/**
+ * Synchronizes recent messages from Twilio REST API into Sahaara's database.
+ */
+export const syncWhatsAppMessages = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => syncWhatsAppMessagesInput.parse(d))
+  .handler(async ({ data, context }) => {
+    return await syncTwilioWhatsAppMessages({
+      userId: context.userId,
+      limit: data.limit,
+    });
+  });
+
+/**
+ * Retrieves the WhatsApp summary (identities, conversation, messages) for a Senior.
+ */
+export const getSeniorWhatsAppSummary = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => getSeniorWhatsAppSummaryInput.parse(d))
+  .handler(async ({ data, context }) => {
+    return await getSeniorWhatsAppSummaryForUser({
+      userId: context.userId,
+      seniorId: data.seniorId,
+    });
+  });
+
+/**
+ * Links a WhatsApp phone number to a senior.
+ */
+export const linkSeniorWhatsAppIdentity = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => linkSeniorWhatsAppIdentityInput.parse(d))
+  .handler(async ({ data, context }) => {
+    return await linkSeniorWhatsAppIdentityForUser({
+      userId: context.userId,
+      seniorId: data.seniorId,
+      phoneNumber: data.phoneNumber,
+      displayName: data.displayName,
+      relationshipType: data.relationshipType,
+    });
+  });

@@ -26,6 +26,7 @@ import { RecordObservation } from "@/components/seniors/record-observation";
 import { WellbeingSummary } from "@/components/seniors/wellbeing-summary";
 import { SeniorAIChat } from "@/components/ai/senior-ai-chat";
 import { DailyRoutine } from "@/components/seniors/daily-routine";
+import { SeniorWhatsAppSection } from "@/components/seniors/senior-whatsapp-section";
 import { ObservationTrends } from "@/components/seniors/observation-trends";
 import { MetricCard } from "@/components/shell/metric";
 import { Page, Section } from "@/components/shell/page";
@@ -57,7 +58,15 @@ import {
   type ObservationRow,
 } from "@/lib/seniors";
 
-const TABS = ["overview", "today", "observations", "alerts", "reports", "family"] as const;
+const TABS = [
+  "overview",
+  "today",
+  "observations",
+  "alerts",
+  "reports",
+  "family",
+  "whatsapp",
+] as const;
 type Tab = (typeof TABS)[number];
 
 export const Route = createFileRoute("/_authenticated/seniors/$seniorId/")({
@@ -231,6 +240,9 @@ function Profile({ s, seniorId }: { s: SeniorRecord; seniorId: string }) {
           <TabsTrigger value="family" className="min-h-10 px-4">
             Family & Caregivers
           </TabsTrigger>
+          <TabsTrigger value="whatsapp" className="min-h-10 px-4">
+            WhatsApp
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="flex flex-col gap-8">
@@ -294,6 +306,10 @@ function Profile({ s, seniorId }: { s: SeniorRecord; seniorId: string }) {
 
         <TabsContent value="family" className="flex flex-col gap-8">
           <SeniorFamilyManager seniorId={seniorId} seniorName={s.display_name} />
+        </TabsContent>
+
+        <TabsContent value="whatsapp" className="flex flex-col gap-8">
+          <SeniorWhatsAppSection seniorId={seniorId} seniorName={s.display_name} />
         </TabsContent>
       </Tabs>
     </Page>

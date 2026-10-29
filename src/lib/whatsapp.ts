@@ -500,3 +500,29 @@ export const markConversationReadInput = z.object({
   conversationId: z.string().uuid("Invalid conversation ID"),
 });
 export type MarkConversationReadInput = z.infer<typeof markConversationReadInput>;
+
+export const sendWhatsAppMessageInput = z.object({
+  conversationId: z.string().uuid("Invalid conversation ID"),
+  bodyText: z.string().trim().min(1, "Message text cannot be empty").max(4096, "Message too long"),
+  contentSid: z.string().trim().optional(),
+  contentVariables: z.record(z.string()).optional(),
+});
+export type SendWhatsAppMessageInput = z.infer<typeof sendWhatsAppMessageInput>;
+
+export const syncWhatsAppMessagesInput = z.object({
+  limit: z.number().int().min(1).max(50).default(25),
+});
+export type SyncWhatsAppMessagesInput = z.infer<typeof syncWhatsAppMessagesInput>;
+
+export const linkSeniorWhatsAppIdentityInput = z.object({
+  seniorId: z.string().uuid("Invalid senior ID"),
+  phoneNumber: e164PhoneSchema,
+  displayName: z.string().trim().min(1, "Name is required").max(100),
+  relationshipType: z.enum(WHATSAPP_RELATIONSHIP_TYPES).default("family_member"),
+});
+export type LinkSeniorWhatsAppIdentityInput = z.infer<typeof linkSeniorWhatsAppIdentityInput>;
+
+export const getSeniorWhatsAppSummaryInput = z.object({
+  seniorId: z.string().uuid("Invalid senior ID"),
+});
+export type GetSeniorWhatsAppSummaryInput = z.infer<typeof getSeniorWhatsAppSummaryInput>;

@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import {
+  AlertCircle,
   ArrowLeft,
   Check,
   CheckCheck,
@@ -8,7 +10,6 @@ import {
   ExternalLink,
   FileText,
   Image as ImageIcon,
-  Lock,
   MessagesSquare,
   RefreshCw,
   Send,
@@ -21,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ConversationSummary, MessageItem } from "@/lib/whatsapp.server";
+import { sendWhatsAppMessage, syncWhatsAppMessages } from "@/lib/whatsapp.functions";
 import { cn } from "@/lib/utils";
 
 export interface ConversationViewProps {
@@ -31,6 +33,7 @@ export interface ConversationViewProps {
   onRefresh: () => void;
   onBackToList?: () => void;
   totalMessages: number;
+  onSendMessage?: (bodyText: string) => Promise<void>;
 }
 
 /** Formats message time cleanly for bubbles. */
@@ -69,8 +72,16 @@ export function ConversationView({
   isFetching,
   onRefresh,
   onBackToList,
+  onSendMessage,
 }: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sendWhatsAppMessageFn = useServerFn(sendWhatsAppMessage);
+  const syncMessagesFn = useServerFn(syncWhatsAppMessages);
+
+  const [inputText, setInputText] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Auto-scroll to latest message on load and when messages change
   useEffect(() => {
@@ -78,6 +89,49 @@ export function ConversationView({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isLoading]);
+
+  const handleSend = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const text = inputText.trim();
+    if (!text || !conversation || isSending) return;
+
+    setIsSending(true);
+    setSendError(null);
+    try {
+      if (onSendMessage) {
+        await onSendMessage(text);
+      } else {
+        await sendWhatsAppMessageFn({
+          data: {
+            conversationId: conversation.id,
+            bodyText: text,
+          },
+        });
+      }
+      setInputText("");
+      onRefresh();
+    } catch (err: unknown) {
+      setSendError(
+        err instanceof Error
+          ? err.message
+          : "Failed to send WhatsApp message. Please check your Twilio configuration.",
+      );
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      await syncMessagesFn({ data: { limit: 30 } });
+      onRefresh();
+    } catch {
+      // Ignored
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // When no conversation is selected
   if (!conversation) {
@@ -180,6 +234,21 @@ export function ConversationView({
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSync}
+            disabled={isSyncing || isFetching}
+            className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            title="Sync WhatsApp messages with Twilio"
+          >
+            <RefreshCw
+              className={cn("size-3.5", (isSyncing || isFetching) && "animate-spin text-primary")}
+              aria-hidden="true"
+            />
+            <span>{isSyncing ? "Syncing..." : "Sync Twilio"}</span>
+          </Button>
+
           <Button
             variant="ghost"
             size="icon"
@@ -312,36 +381,61 @@ export function ConversationView({
         )}
       </div>
 
-      {/* 3. Composer / Honest Outbound Status */}
+      {/* 3. Interactive Message Composer */}
       <footer className="border-t border-border bg-card p-3">
-        {/* Honest Status Banner */}
-        <div className="mb-2 flex items-center gap-2 rounded-lg bg-secondary/80 px-3 py-1.5 text-xs text-muted-foreground">
-          <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span>
-            Outbound WhatsApp replies are disabled in this phase. Incoming messages and care updates
-            are recorded in real time.
-          </span>
-        </div>
+        {sendError && (
+          <div className="mb-2 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-2.5 text-xs text-destructive">
+            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold">Message failed to send</p>
+              <p className="mt-0.5">{sendError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSendError(null)}
+              className="text-destructive/70 hover:text-destructive"
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
-        {/* Read-Only Input */}
-        <div className="flex items-center gap-2">
+        <form onSubmit={handleSend} className="flex items-center gap-2">
           <input
             type="text"
-            disabled
-            placeholder="Outbound WhatsApp replies will be enabled in a future release..."
-            className="flex-1 rounded-md border border-input bg-muted/40 px-3 py-2 text-xs text-muted-foreground cursor-not-allowed"
-            aria-label="Message input disabled"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
+            disabled={isSending}
+            placeholder={`Reply to ${contactName} on WhatsApp...`}
+            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-2xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+            aria-label={`Reply to ${contactName} on WhatsApp`}
+            maxLength={4000}
           />
           <Button
-            disabled
+            type="submit"
+            disabled={isSending || !inputText.trim()}
             size="sm"
-            variant="secondary"
-            className="h-8 gap-1.5 text-xs cursor-not-allowed"
-            aria-label="Send reply disabled"
+            className="h-9 gap-1.5 px-4 text-xs font-medium"
+            aria-label="Send WhatsApp message"
           >
-            <Send className="size-3.5" />
+            {isSending ? (
+              <RefreshCw className="size-3.5 animate-spin" />
+            ) : (
+              <Send className="size-3.5" />
+            )}
             Send
           </Button>
+        </form>
+        <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>Sends a real message to {contactName} on WhatsApp</span>
+          <span>{inputText.length}/4000</span>
         </div>
       </footer>
     </section>
