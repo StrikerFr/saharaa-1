@@ -3,8 +3,7 @@
 // idempotently records messages, and returns standard TwiML (<Response/>).
 // Never logs raw auth tokens, signatures, or sensitive care data.
 
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
+import type { Json } from "@/integrations/supabase/types";
 import {
   buildCanonicalWebhookUrl,
   getTwilioServerConfig,
@@ -12,6 +11,7 @@ import {
   validateTwilioWebhookDetailed,
 } from "./twilio.server";
 import { computePayloadChecksum } from "./whatsapp";
+import { persistInboundWhatsAppMessage } from "./whatsapp.server";
 
 const WEBHOOK_PATH = "/api/twilio/whatsapp";
 
@@ -28,25 +28,9 @@ export interface WebhookHandlerResult {
 }
 
 /**
- * Creates a server-side Supabase admin client for webhook message recording.
- */
-function getSupabaseAdmin() {
-  const url = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || "https://jiqvjuquxrsglradhhpo.supabase.co";
-  const key = process.env["SUPABASE_SERVICE_ROLE_KEY"] || process.env["SAHAARA_SERVICE_ROLE_KEY"];
-  if (!key) {
-    return null;
-  }
-  return createClient<Database>(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
-
-/**
  * Parses application/x-www-form-urlencoded request body.
  */
-export async function parseUrlEncodedBody(
-  request: Request
-): Promise<Record<string, string>> {
+export async function parseUrlEncodedBody(request: Request): Promise<Record<string, string>> {
   const text = await request.text();
   const params: Record<string, string> = {};
   if (!text || text.trim().length === 0) return params;
@@ -61,9 +45,7 @@ export async function parseUrlEncodedBody(
 /**
  * Handles incoming Twilio WhatsApp webhook requests.
  */
-export async function handleTwilioWhatsAppWebhook(
-  request: Request
-): Promise<Response> {
+export async function handleTwilioWhatsAppWebhook(request: Request): Promise<Response> {
   // Only accept POST for incoming message webhooks
   if (request.method !== "POST") {
     // Return lightweight status check on GET for easy monitoring
@@ -87,7 +69,7 @@ export async function handleTwilioWhatsAppWebhook(
         {
           status: 200,
           headers: { "content-type": "application/json" },
-        }
+        },
       );
     }
 
@@ -180,39 +162,46 @@ export async function handleTwilioWhatsAppWebhook(
   // Compute payload checksum for idempotency & audit
   const payloadChecksum = computePayloadChecksum(params);
 
-  // 3. Persist Message Idempotently via Supabase RPC or Direct Tables
-  try {
-    const supabase = getSupabaseAdmin();
-
-    if (supabase) {
-      // Default org ID (Sahaara Care Core / Test Demo Cohort)
-      const defaultOrgId = "7e570000-0000-4000-8000-0000000000a1";
-
-      // Attempt to invoke the idempotent database RPC function
-      await supabase.rpc(
-        "record_whatsapp_inbound_message" as never,
-        {
-          _org_id: defaultOrgId,
-          _provider_sid: providerSid,
-          _from_number: fromNorm.e164,
-          _to_number: toNorm.e164,
-          _body: bodyText,
-          _media: {},
-          _raw_checksum: payloadChecksum,
-        } as never
-      );
+  // Extract optional media metadata if present
+  const numMedia = parseInt(params["NumMedia"] || "0", 10);
+  const mediaMeta: Record<string, Json> = {};
+  if (numMedia > 0) {
+    for (let i = 0; i < numMedia; i++) {
+      const mediaUrl = params[`MediaUrl${i}`];
+      if (mediaUrl) {
+        mediaMeta[`media_${i}`] = {
+          url: mediaUrl,
+          contentType: params[`MediaContentType${i}`] || "application/octet-stream",
+        };
+      }
     }
+  }
+
+  // 3. Persist Message Idempotently via Server-Only Database Service
+  try {
+    await persistInboundWhatsAppMessage({
+      providerSid,
+      fromNumber: fromNorm.e164,
+      toNumber: toNorm.e164,
+      bodyText,
+      mediaMeta,
+      profileName: params["ProfileName"] || null,
+      payloadChecksum,
+    });
 
     return new Response(EMPTY_TWIML_RESPONSE, {
       status: 200,
       headers: { "content-type": "text/xml; charset=utf-8" },
     });
   } catch (error) {
-    console.error("Error processing inbound WhatsApp webhook:", error instanceof Error ? error.message : "Unknown error");
-    // Return 200 with empty TwiML to prevent Twilio exponential backoff storms while logging the error
-    return new Response(EMPTY_TWIML_RESPONSE, {
-      status: 200,
-      headers: { "content-type": "text/xml; charset=utf-8" },
+    console.error(
+      "Error processing inbound WhatsApp webhook:",
+      error instanceof Error ? error.message : "Persistence failure",
+    );
+    // Return retryable error 500 so Twilio retries rather than silently losing the message
+    return new Response("Internal Server Error: Message persistence failed", {
+      status: 500,
+      headers: { "content-type": "text/plain" },
     });
   }
 }

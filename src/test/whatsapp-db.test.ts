@@ -211,10 +211,7 @@ describe("Phase 2B: WhatsApp Database & Identity Foundation", () => {
     });
 
     it("resolves correctly when explicit senior context is provided for a shared phone", () => {
-      const res = resolvePhoneIdentity(
-        [singleSeniorIdentity, secondSeniorIdentity],
-        validSeniorId
-      );
+      const res = resolvePhoneIdentity([singleSeniorIdentity, secondSeniorIdentity], validSeniorId);
       expect(res).toEqual({
         status: "unique_match",
         identity: singleSeniorIdentity,
@@ -293,7 +290,7 @@ describe("Phase 2B: WhatsApp Database & Identity Foundation", () => {
           direction: "inbound",
           fromNumber: "+919876543210",
           toNumber: "+14155238886",
-        })
+        }),
       ).toThrow();
     });
 
@@ -345,7 +342,7 @@ describe("Phase 2B: WhatsApp Database & Identity Foundation", () => {
         createVerificationChallengeInput.parse({
           orgId: "not-a-uuid",
           phoneNumber: "+919876543210",
-        })
+        }),
       ).toThrow();
     });
 
@@ -360,14 +357,14 @@ describe("Phase 2B: WhatsApp Database & Identity Foundation", () => {
         confirmVerificationChallengeInput.parse({
           challengeId: "11111111-1111-4111-a111-111111111111",
           pin: "123", // too short
-        })
+        }),
       ).toThrow();
 
       expect(() =>
         confirmVerificationChallengeInput.parse({
           challengeId: "11111111-1111-4111-a111-111111111111",
           pin: "12345a", // non-digit
-        })
+        }),
       ).toThrow();
     });
 
@@ -381,9 +378,8 @@ describe("Phase 2B: WhatsApp Database & Identity Foundation", () => {
       expect(() =>
         revokeWhatsAppIdentityInput.parse({
           identityId: "not-a-uuid",
-        })
+        }),
       ).toThrow();
     });
   });
 });
-

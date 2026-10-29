@@ -49,7 +49,7 @@ describe("Phase 3: Inbound Twilio WhatsApp Webhook Endpoint", () => {
   function createSignedRequest(
     params: Record<string, string>,
     url = canonicalUrl,
-    customSignature?: string | null
+    customSignature?: string | null,
   ): Request {
     const searchParams = new URLSearchParams(params);
     const body = searchParams.toString();
