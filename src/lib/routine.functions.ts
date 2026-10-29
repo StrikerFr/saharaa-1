@@ -192,3 +192,38 @@ export const interpretRoutineUpdate = createServerFn({ method: "POST" })
       return { ok: false, message: userMessage(pe) };
     }
   });
+
+export type TranscribeRoutineResult =
+  | { ok: true; text: string; language: string | null }
+  | { ok: false; message: string };
+
+export const transcribeRoutineAudio = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => {
+    if (!(d instanceof FormData)) throw new Error("Expected a form upload.");
+    const file = d.get("audio");
+    if (!(file instanceof File)) throw new Error("Choose an audio file.");
+    const seniorId = d.get("seniorId");
+    if (typeof seniorId !== "string" || !seniorId) throw new Error("Missing seniorId.");
+    return { seniorId, file };
+  })
+  .handler(async ({ data, context }): Promise<TranscribeRoutineResult> => {
+    const { data: access } = await (context.supabase as any).rpc("can_access_senior", {
+      _senior: data.seniorId,
+    });
+    if (access !== true) throw new Error("You don't have access to this senior.");
+
+    const { checkAudio, AUDIO_REASON_MESSAGES } = await import("@/lib/ai/audio");
+    const head = new Uint8Array(await data.file.slice(0, 16).arrayBuffer());
+    const chk = checkAudio(data.file.name, data.file.type, data.file.size, head);
+    if (!chk.ok) return { ok: false, message: AUDIO_REASON_MESSAGES[chk.reason] };
+
+    const { groqConfig, transcribe } = await import("@/lib/ai/groq.server");
+    try {
+      const t = await transcribe(data.file, `routine.${chk.format}`, null, groqConfig());
+      return { ok: true, text: t.text, language: t.language };
+    } catch (e) {
+      const pe = e instanceof ProviderError ? e : new ProviderError("provider_error", "groq");
+      return { ok: false, message: userMessage(pe) };
+    }
+  });

@@ -1,8 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Pill, ListChecks, AlarmClock, CircleX, Check, ChevronLeft, ChevronRight, Pencil, Plus, Sparkles, X, Minus, RotateCcw } from "lucide-react";
+import {
+  AlarmClock,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CircleX,
+  ListChecks,
+  Loader2,
+  Mic,
+  MicOff,
+  Minus,
+  Pencil,
+  Pill,
+  Plus,
+  RotateCcw,
+  Sparkles,
+  Square,
+  X,
+  Zap,
+} from "lucide-react";
 
 import { EmptyState, Notice, StatusBadge } from "@/components/shell/states";
 import { MetricCard } from "@/components/shell/metric";
@@ -42,6 +61,7 @@ import {
   interpretRoutineUpdate,
   logRoutine,
   saveRoutineItem,
+  transcribeRoutineAudio,
   type InterpretResult,
 } from "@/lib/routine.functions";
 import { cn } from "@/lib/utils";
@@ -301,83 +321,546 @@ function ChecklistRow({ entry, date, timeZone, seniorId, onEdit }: { entry: DayE
   );
 }
 
-function AiUpdate({ seniorId, date, timeZone, entries }: { seniorId: string; date: string; timeZone: string; entries: DayEntry[] }) {
+function AiUpdate({
+  seniorId,
+  date,
+  timeZone,
+  entries,
+}: {
+  seniorId: string;
+  date: string;
+  timeZone: string;
+  entries: DayEntry[];
+}) {
   const [text, setText] = useState("");
   const [result, setResult] = useState<Extract<InterpretResult, { ok: true }> | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const run = useServerFn(interpretRoutineUpdate);
+  const [pickedNewItems, setPickedNewItems] = useState<Set<number>>(new Set());
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  const [successFeedback, setSuccessFeedback] = useState<string | null>(null);
+  const [autoApply, setAutoApply] = useState(false);
+  const [autoApplyCountdown, setAutoApplyCountdown] = useState<number | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const speechRecRef = useRef<any>(null);
+  const speechAccumulatedRef = useRef<string>("");
+
+  const runInterpret = useServerFn(interpretRoutineUpdate);
+  const runTranscribe = useServerFn(transcribeRoutineAudio);
+  const runSaveItem = useServerFn(saveRoutineItem);
+  const qc = useQueryClient();
+
   const ask = useMutation({
-    mutationFn: () => run({ data: { seniorId, date, text } }),
+    mutationFn: (overrideText?: string | void) =>
+      runInterpret({ data: { seniorId, date, text: (typeof overrideText === "string" ? overrideText : text) } }),
     onSuccess: (r) => {
       if (r.ok) {
         setResult(r);
         setPicked(new Set(r.updates.map((u) => u.item_id)));
+        setPickedNewItems(new Set((r.new_items || []).map((_, i) => i)));
+
+        // If auto-apply is toggled on and suggestions are found, start a 3-second quick apply countdown
+        if (autoApply && (r.updates.length > 0 || (r.new_items && r.new_items.length > 0))) {
+          setAutoApplyCountdown(3);
+        }
       }
     },
   });
+
   const save = useLog(seniorId);
   const byId = useMemo(() => new Map(entries.map((e) => [e.item.id, e.item])), [entries]);
 
-  const confirm = () => {
+  // Clean up streams & timers on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+      }
+      if (speechRecRef.current) {
+        try {
+          speechRecRef.current.stop();
+        } catch {}
+      }
+    };
+  }, []);
+
+  // Handle auto-apply countdown
+  useEffect(() => {
+    if (autoApplyCountdown === null) return;
+    if (autoApplyCountdown > 0) {
+      countdownTimerRef.current = setTimeout(() => {
+        setAutoApplyCountdown((c) => (c !== null ? c - 1 : null));
+      }, 1000);
+    } else if (autoApplyCountdown === 0) {
+      setAutoApplyCountdown(null);
+      directApply();
+    }
+    return () => {
+      if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
+    };
+  }, [autoApplyCountdown, result]);
+
+  const startVoiceRecording = async () => {
+    setVoiceNotice(null);
+    setSuccessFeedback(null);
+    setResult(null);
+    setAutoApplyCountdown(null);
+    chunksRef.current = [];
+    speechAccumulatedRef.current = "";
+
+    // 1. Try starting Web Speech API for real-time dictation into the textarea
+    const SpeechRec =
+      typeof window !== "undefined"
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
+
+    if (SpeechRec) {
+      try {
+        const rec = new SpeechRec();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = "hi-IN"; // Covers Hindi, Hinglish and Indian English
+        rec.onresult = (event: any) => {
+          let currentTranscript = "";
+          for (let i = 0; i < event.results.length; i++) {
+            currentTranscript += event.results[i][0].transcript;
+          }
+          speechAccumulatedRef.current = currentTranscript;
+          setText(currentTranscript);
+        };
+        rec.onerror = () => {
+          // Handled gracefully by MediaRecorder fallback
+        };
+        rec.start();
+        speechRecRef.current = rec;
+      } catch {
+        // Fallback to MediaRecorder
+      }
+    }
+
+    // 2. Start MediaRecorder for high-fidelity audio capture (with Groq Whisper STT)
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      if (!SpeechRec) {
+        setVoiceNotice("Microphone recording is not supported in this browser. Please type your update.");
+        return;
+      }
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      timerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
+      streamRef.current = stream;
+
+      let mimeType = "audio/webm";
+      if (typeof MediaRecorder !== "undefined") {
+        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+          mimeType = "audio/webm;codecs=opus";
+        } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+          mimeType = "audio/mp4";
+        }
+      }
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.start(250);
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      timerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    } catch {
+      if (!SpeechRec) {
+        setVoiceNotice("Microphone access was denied. Please allow microphone permissions in your browser.");
+        return;
+      }
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      timerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    }
+  };
+
+  const stopVoiceRecording = async () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setIsRecording(false);
+
+    // Stop speech recognition
+    if (speechRecRef.current) {
+      try {
+        speechRecRef.current.stop();
+      } catch {}
+      speechRecRef.current = null;
+    }
+
+    const liveText = speechAccumulatedRef.current.trim();
+
+    // Stop media recorder
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+      streamRef.current = null;
+    }
+
+    // If live dictation captured sufficient text, use it directly!
+    if (liveText.length >= 2) {
+      setText(liveText);
+      ask.mutate(liveText);
+      return;
+    }
+
+    // Otherwise, transcribe recorded audio via Groq Whisper server function
+    const chunks = chunksRef.current;
+    if (chunks.length > 0) {
+      setIsTranscribing(true);
+      try {
+        const mime = recorder?.mimeType || "audio/webm";
+        const ext = mime.includes("mp4") ? "mp4" : "webm";
+        const blob = new Blob(chunks, { type: mime });
+        const file = new File([blob], `routine_audio.${ext}`, { type: mime });
+
+        const formData = new FormData();
+        formData.append("audio", file);
+        formData.append("seniorId", seniorId);
+
+        const res = await runTranscribe({ data: formData });
+        if (res.ok && res.text) {
+          const transcribed = res.text.trim();
+          setText(transcribed);
+          ask.mutate(transcribed);
+        } else if (!res.ok) {
+          setVoiceNotice(res.message);
+        }
+      } catch (err: unknown) {
+        setVoiceNotice(err instanceof Error ? err.message : "Failed to transcribe audio.");
+      } finally {
+        setIsTranscribing(false);
+      }
+    }
+  };
+
+  const cancelVoiceRecording = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setIsRecording(false);
+    if (speechRecRef.current) {
+      try {
+        speechRecRef.current.stop();
+      } catch {}
+      speechRecRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+      streamRef.current = null;
+    }
+    chunksRef.current = [];
+  };
+
+  const directApply = async () => {
     if (!result) return;
+    setAutoApplyCountdown(null);
+
     const list = result.updates.filter((u) => picked.has(u.item_id));
-    save.mutate(
-      list.map((u) => ({
-        itemId: u.item_id,
-        date,
-        status: u.status,
-        doneAt: u.status === "done" && u.time ? zonedTimeToIso(date, u.time, timeZone) : null,
-        note: u.note,
-        source: "ai_assist" as const,
-        clientRequestId: crypto.randomUUID(),
-      })),
-      { onSuccess: () => { setResult(null); setText(""); } },
+    const newItemsToSave = (result.new_items || []).filter((_, idx) =>
+      pickedNewItems.has(idx),
     );
+
+    let savedCount = 0;
+
+    // 1. Save routine logs
+    if (list.length > 0) {
+      await save.mutateAsync(
+        list.map((u) => ({
+          itemId: u.item_id,
+          date,
+          status: u.status,
+          doneAt: u.status === "done" && u.time ? zonedTimeToIso(date, u.time, timeZone) : null,
+          note: u.note,
+          source: "ai_assist" as const,
+          clientRequestId: crypto.randomUUID(),
+        })),
+      );
+      savedCount += list.length;
+    }
+
+    // 2. Save any newly requested routine items
+    if (newItemsToSave.length > 0) {
+      for (const item of newItemsToSave) {
+        await runSaveItem({
+          data: {
+            seniorId,
+            itemId: null,
+            category: item.category,
+            title: item.title,
+            details: item.details ?? null,
+            time: item.time,
+            days: [1, 2, 3, 4, 5, 6, 7],
+            active: true,
+          },
+        });
+        savedCount++;
+      }
+      await qc.invalidateQueries({ queryKey: ["routine", seniorId] });
+    }
+
+    setSuccessFeedback(
+      `Directly updated ${savedCount} item${savedCount === 1 ? "" : "s"} in the daily routine!`,
+    );
+    setResult(null);
+    setText("");
+    setTimeout(() => setSuccessFeedback(null), 5000);
+  };
+
+  const formatTimer = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
 
   return (
     <section className="surface flex flex-col gap-3 p-5" aria-labelledby="ai-upd-h">
-      <div>
-        <h2 id="ai-upd-h" className="flex items-center gap-2 font-semibold"><Sparkles className="size-4" aria-hidden="true" /> Update by telling the AI</h2>
-        <p className="text-sm text-muted-foreground">
-          Type what happened in English, Hindi or Hinglish, e.g. “subah ki BP wali dawai 9 baje li, lunch nahi kiya”. You review every suggestion before it is saved.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 id="ai-upd-h" className="flex items-center gap-2 font-semibold">
+            <Sparkles className="size-4 text-primary" aria-hidden="true" />
+            Update by telling the AI
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Type or speak what happened in English, Hindi or Hinglish, e.g. “subah ki BP wali dawai 9 baje li, lunch nahi kiya”.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={autoApply}
+              onChange={(e) => setAutoApply(e.target.checked)}
+              className="size-3.5 rounded border-input"
+            />
+            <span className="flex items-center gap-1">
+              <Zap className="size-3 text-amber-500" />
+              Direct auto-apply
+            </span>
+          </label>
+        </div>
       </div>
-      <Textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} rows={3} aria-label="Describe today's updates" />
-      <div>
-        <Button onClick={() => ask.mutate()} disabled={text.trim().length < 2 || ask.isPending}>
-          {ask.isPending ? "Reading…" : "Suggest updates"}
+
+      {/* Voice Recording / Transcribing active banner */}
+      {isRecording && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex size-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex size-3 rounded-full bg-red-500" />
+            </span>
+            <span className="font-medium text-foreground">Listening... speak your care update</span>
+            <span className="font-mono text-xs text-muted-foreground">({formatTimer(recordingSeconds)})</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="default" onClick={stopVoiceRecording} className="bg-red-600 hover:bg-red-700 text-white">
+              <Square className="mr-1 size-3.5 fill-current" /> Stop & Apply
+            </Button>
+            <Button size="sm" variant="ghost" onClick={cancelVoiceRecording}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isTranscribing && (
+        <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin text-primary" />
+          <span>Transcribing voice update with AI Whisper...</span>
+        </div>
+      )}
+
+      {voiceNotice && (
+        <Notice tone="warning" title="Voice notice">
+          {voiceNotice}
+        </Notice>
+      )}
+
+      {successFeedback && (
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-800 dark:text-emerald-200">
+          <Check className="size-4 text-emerald-600" />
+          <span>{successFeedback}</span>
+        </div>
+      )}
+
+      <Textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        maxLength={2000}
+        rows={3}
+        placeholder="Type or click the microphone to speak, e.g. “Dada ji ne subah ki BP dawai 9 baje li, lunch ho gaya”..."
+        aria-label="Describe today's updates"
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          onClick={() => ask.mutate()}
+          disabled={text.trim().length < 2 || ask.isPending || isRecording || isTranscribing}
+        >
+          {ask.isPending ? (
+            <>
+              <Loader2 className="mr-1.5 size-4 animate-spin" />
+              Interpreting…
+            </>
+          ) : (
+            <>
+              <Sparkles className="mr-1.5 size-4" />
+              Suggest updates
+            </>
+          )}
         </Button>
+
+        {!isRecording ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={startVoiceRecording}
+            disabled={ask.isPending || isTranscribing}
+            className="flex items-center gap-1.5"
+          >
+            <Mic className="size-4 text-primary" />
+            <span>Speak update</span>
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={stopVoiceRecording}
+            className="flex items-center gap-1.5"
+          >
+            <Square className="size-4 fill-current" />
+            <span>Finish speaking</span>
+          </Button>
+        )}
       </div>
-      {ask.data && !ask.data.ok && <Notice tone="warning" title="No suggestions">{ask.data.message}</Notice>}
+
+      {ask.data && !ask.data.ok && (
+        <Notice tone="warning" title="No suggestions">
+          {ask.data.message}
+        </Notice>
+      )}
+
       {result && (
-        <div className="flex flex-col gap-2 rounded-lg border p-3">
-          <p className="text-sm font-semibold">Suggested updates <StatusBadge tone="warning">Unverified — please check</StatusBadge></p>
-          {result.updates.length === 0 && <p className="text-sm text-muted-foreground">The AI couldn't match anything to the schedule.</p>}
+        <div className="flex flex-col gap-3 rounded-lg border p-4 bg-muted/20">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold flex items-center gap-2">
+              <span>Suggested updates</span>
+              <StatusBadge tone="warning">Unverified — please confirm</StatusBadge>
+            </p>
+            {autoApplyCountdown !== null && (
+              <span className="text-xs font-semibold text-amber-600 animate-pulse">
+                Directly applying in {autoApplyCountdown}s...
+              </span>
+            )}
+          </div>
+
+          {result.updates.length === 0 && (!result.new_items || result.new_items.length === 0) && (
+            <p className="text-sm text-muted-foreground">The AI couldn't match anything to the schedule.</p>
+          )}
+
+          {/* Matched Scheduled Routine Items */}
           {result.updates.map((u) => {
             const it = byId.get(u.item_id);
             if (!it) return null;
             return (
-              <label key={u.item_id} className="flex items-start gap-2 text-sm">
-                <input type="checkbox" className="mt-1 size-4" checked={picked.has(u.item_id)} onChange={(e) => {
-                  const n = new Set(picked);
-                  if (e.target.checked) n.add(u.item_id); else n.delete(u.item_id);
-                  setPicked(n);
-                }} />
+              <label key={u.item_id} className="flex items-start gap-2 text-sm cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4 rounded border-input"
+                  checked={picked.has(u.item_id)}
+                  onChange={(e) => {
+                    const n = new Set(picked);
+                    if (e.target.checked) n.add(u.item_id);
+                    else n.delete(u.item_id);
+                    setPicked(n);
+                  }}
+                />
                 <span>
-                  <strong>{it.title}</strong> ({formatTime(it.scheduled_time)}) → {STATUS_LABEL[u.status]}
-                  {u.time ? ` at ${u.time}` : ""}{u.note ? ` — “${u.note}”` : ""}
+                  <strong>{it.title}</strong> ({formatTime(it.scheduled_time)}) →{" "}
+                  <span className="font-semibold text-primary">{STATUS_LABEL[u.status]}</span>
+                  {u.time ? ` at ${u.time}` : ""}
+                  {u.note ? ` — “${u.note}”` : ""}
                 </span>
               </label>
             );
           })}
+
+          {/* New Scheduled Items Detected by Voice/Text */}
+          {result.new_items && result.new_items.map((item, idx) => (
+            <label key={`new_${idx}`} className="flex items-start gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="mt-1 size-4 rounded border-input"
+                checked={pickedNewItems.has(idx)}
+                onChange={(e) => {
+                  const n = new Set(pickedNewItems);
+                  if (e.target.checked) n.add(idx);
+                  else n.delete(idx);
+                  setPickedNewItems(n);
+                }}
+              />
+              <span>
+                <span className="font-semibold text-emerald-700 dark:text-emerald-300">+ Add to routine plan:</span>{" "}
+                <strong>{item.title}</strong> ({item.time}) · {ROUTINE_CATEGORIES[item.category]?.label || item.category}
+                {item.details ? ` — “${item.details}”` : ""}
+              </span>
+            </label>
+          ))}
+
           {result.unmatched.length > 0 && (
-            <p className="text-sm text-muted-foreground">Not matched to the schedule: {result.unmatched.join("; ")}</p>
+            <p className="text-xs text-muted-foreground">
+              Not matched to schedule: {result.unmatched.join("; ")}
+            </p>
           )}
-          <div className="flex gap-2">
-            <Button onClick={confirm} disabled={picked.size === 0 || save.isPending}>Save {picked.size} selected</Button>
-            <Button variant="outline" onClick={() => setResult(null)}>Discard</Button>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Button
+              onClick={directApply}
+              disabled={picked.size + pickedNewItems.size === 0 || save.isPending}
+              className="bg-primary hover:bg-primary/90"
+            >
+              <Check className="mr-1.5 size-4" />
+              Apply {picked.size + pickedNewItems.size} update{picked.size + pickedNewItems.size === 1 ? "" : "s"} directly
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setResult(null);
+                setAutoApplyCountdown(null);
+              }}
+            >
+              Discard
+            </Button>
           </div>
+
           {save.isError && <p role="alert" className="text-sm text-destructive">{save.error.message}</p>}
         </div>
       )}

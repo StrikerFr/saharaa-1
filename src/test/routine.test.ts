@@ -78,4 +78,31 @@ describe("daily routine", () => {
     const r = parseRoutineAi(raw, new Set(["a"]));
     expect(r.ok && r.value.updates.map((u) => u.item_id)).toEqual(["a"]);
   });
+
+  it("AI suggestions extract newly requested routine items correctly", () => {
+    const raw = JSON.stringify({
+      updates: [
+        { item_id: "a", status: "done", time: "08:30", note: "after breakfast" },
+      ],
+      unmatched: [],
+      new_items: [
+        {
+          title: "Evening Walk",
+          category: "exercise",
+          time: "18:00",
+          details: "20 minutes in park",
+        },
+      ],
+    });
+    const r = parseRoutineAi(raw, new Set(["a"]));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.updates).toHaveLength(1);
+      expect(r.value.updates[0]?.item_id).toBe("a");
+      expect(r.value.new_items).toHaveLength(1);
+      expect(r.value.new_items?.[0]?.title).toBe("Evening Walk");
+      expect(r.value.new_items?.[0]?.category).toBe("exercise");
+      expect(r.value.new_items?.[0]?.time).toBe("18:00");
+    }
+  });
 });
