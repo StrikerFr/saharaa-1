@@ -1,12 +1,25 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Bot, ChevronDown, ChevronUp, MessageSquare, Send, Sparkles, User } from "lucide-react";
+import {
+  AlertCircle,
+  Bot,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Heart,
+  MessageSquare,
+  Pill,
+  Send,
+  Sparkles,
+  User,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { askSeniorAI } from "@/lib/ai-assistant.functions";
+import { askSeniorAI, cleanSeniorDisplayName } from "@/lib/ai-assistant.functions";
 
 interface SeniorAIChatProps {
   seniorId: string;
@@ -21,12 +34,200 @@ interface ChatMessage {
   timestamp: string;
 }
 
+interface FormattedBlock {
+  type: "heading" | "list" | "callout" | "paragraph";
+  headingText?: string;
+  items?: string[];
+  text?: string;
+}
+
+/**
+ * Parses markdown inline formatting (**bold**, status badges).
+ */
+function renderFormattedInline(raw: string) {
+  if (!raw) return null;
+
+  // Split on **bold**
+  const boldTokens = raw.split(/(\*\*[^*]+\*\*)/g);
+
+  return boldTokens.map((token, idx) => {
+    if (token.startsWith("**") && token.endsWith("**")) {
+      const boldContent = token.slice(2, -2);
+      return (
+        <strong key={idx} className="font-semibold text-foreground">
+          {boldContent}
+        </strong>
+      );
+    }
+
+    // Check for status words to highlight nicely
+    // Words like: "missed", "taken", "completed", "elevated", "higher than usual"
+    const statusRegex =
+      /(\bmissed\b|\btaken\b|\bcompleted\b|\belevated\b|\bhigher than usual\b|\bdelayed\b)/gi;
+    const parts = token.split(statusRegex);
+
+    if (parts.length <= 1) {
+      return <span key={idx}>{token}</span>;
+    }
+
+    return (
+      <span key={idx}>
+        {parts.map((p, pIdx) => {
+          const lower = p.toLowerCase();
+          if (lower === "missed" || lower === "delayed") {
+            return (
+              <span
+                key={pIdx}
+                className="inline-flex items-center rounded bg-warning-soft px-1.5 py-0.5 text-[11px] font-semibold text-warning-foreground border border-warning/30 mx-0.5 align-middle"
+              >
+                {p}
+              </span>
+            );
+          }
+          if (lower === "taken" || lower === "completed") {
+            return (
+              <span
+                key={pIdx}
+                className="inline-flex items-center rounded bg-success-soft px-1.5 py-0.5 text-[11px] font-semibold text-success-foreground border border-success/30 mx-0.5 align-middle"
+              >
+                {p}
+              </span>
+            );
+          }
+          if (lower === "elevated" || lower === "higher than usual") {
+            return (
+              <span
+                key={pIdx}
+                className="inline-flex items-center rounded bg-critical-soft px-1.5 py-0.5 text-[11px] font-semibold text-critical-foreground border border-critical/30 mx-0.5 align-middle"
+              >
+                {p}
+              </span>
+            );
+          }
+          return <span key={pIdx}>{p}</span>;
+        })}
+      </span>
+    );
+  });
+}
+
+/**
+ * Structured, professional markdown renderer for care assistant responses.
+ */
+function CareAssistantMessageContent({ content }: { content: string }) {
+  const blocks = useMemo(() => {
+    const rawLines = content.split("\n");
+    const result: FormattedBlock[] = [];
+    let currentList: string[] = [];
+
+    function flushList() {
+      if (currentList.length > 0) {
+        result.push({ type: "list", items: [...currentList] });
+        currentList = [];
+      }
+    }
+
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i]?.trim() ?? "";
+      if (!line) {
+        flushList();
+        continue;
+      }
+
+      // 1. Heading (### Heading or **Heading alone**)
+      const headingMatch = line.match(/^(?:#{1,4}\s+|\*\*([^*]+)\*\*$:?)(.*)$/);
+      if (line.startsWith("#") || (line.startsWith("**") && line.endsWith("**") && line.length < 80)) {
+        flushList();
+        const cleanTitle = line
+          .replace(/^#{1,4}\s+/, "")
+          .replace(/^\*\*/, "")
+          .replace(/\*\*$/, "")
+          .trim();
+        result.push({ type: "heading", headingText: cleanTitle });
+        continue;
+      }
+
+      // 2. Callout / Summary takeaway (Overall, ... or Summary: ...)
+      if (/^(?:overall|summary|in summary|key takeaway)[:,\s]/i.test(line)) {
+        flushList();
+        result.push({ type: "callout", text: line });
+        continue;
+      }
+
+      // 3. Bullet list items
+      if (/^[-*•]\s+/.test(line) || /^\d+\.\s+/.test(line)) {
+        const cleanItem = line.replace(/^[-*•]\s+/, "").replace(/^\d+\.\s+/, "");
+        currentList.push(cleanItem);
+        continue;
+      }
+
+      // 4. Regular paragraph line
+      flushList();
+      result.push({ type: "paragraph", text: line });
+    }
+
+    flushList();
+    return result;
+  }, [content]);
+
+  return (
+    <div className="flex flex-col gap-2.5 text-card-foreground leading-relaxed text-xs sm:text-sm">
+      {blocks.map((block, idx) => {
+        if (block.type === "heading") {
+          return (
+            <div
+              key={idx}
+              className="mt-3 first:mt-0 mb-1 flex items-center gap-2 border-b border-border/70 pb-1.5 text-xs font-semibold uppercase tracking-wider text-primary"
+            >
+              <span className="size-1.5 rounded-full bg-primary shrink-0" />
+              <span>{block.headingText}</span>
+            </div>
+          );
+        }
+
+        if (block.type === "list" && block.items) {
+          return (
+            <ul key={idx} className="my-1 flex flex-col gap-2 pl-0.5">
+              {block.items.map((item, itemIdx) => (
+                <li key={itemIdx} className="flex items-start gap-2.5 text-card-foreground/95">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/70" />
+                  <div className="flex-1">{renderFormattedInline(item)}</div>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+        if (block.type === "callout" && block.text) {
+          return (
+            <div
+              key={idx}
+              className="mt-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs sm:text-sm font-medium text-foreground flex items-start gap-2.5 shadow-2xs"
+            >
+              <Sparkles className="size-4 text-primary shrink-0 mt-0.5" />
+              <div className="leading-relaxed flex-1">{renderFormattedInline(block.text)}</div>
+            </div>
+          );
+        }
+
+        // Paragraph
+        return (
+          <p key={idx} className="my-0.5 leading-relaxed text-card-foreground/90">
+            {renderFormattedInline(block.text || "")}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAIChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isExpanded, setIsExpanded] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const cleanName = cleanSeniorDisplayName(seniorName);
   const askFn = useServerFn(askSeniorAI);
 
   const mutation = useMutation({
@@ -50,7 +251,7 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
           id: crypto.randomUUID(),
           role: "assistant",
           content: data.answer,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
         },
       ]);
     },
@@ -63,7 +264,7 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
           content:
             err?.message ||
             "Unable to retrieve care records at this moment. Please check your connection and try again.",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
         },
       ]);
     },
@@ -83,7 +284,7 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
       id: crypto.randomUUID(),
       role: "user",
       content: q,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -92,10 +293,10 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
   }
 
   const SUGGESTED_QUESTIONS = [
-    `How is ${seniorName} doing today?`,
-    `Did ${seniorName} take morning medicine today?`,
-    `How has blood pressure & health been past month?`,
-    `Are there any active alerts or missed routines?`,
+    `How is ${cleanName} doing today?`,
+    `Did ${cleanName} take morning medicine today?`,
+    `How has blood pressure & health been over past month?`,
+    `Are there any active care alerts or missed routines?`,
   ];
 
   return (
@@ -109,12 +310,12 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold text-foreground">Ask Sahaara AI</h3>
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                Live Records
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary border border-primary/20">
+                Verified Records
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Direct answers about {seniorName}&apos;s today update, past months health, or routine adherence.
+              Direct answers about {cleanName}&apos;s schedule, medicine adherence, and health records.
             </p>
           </div>
         </div>
@@ -130,11 +331,11 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
       </div>
 
       {isExpanded && (
-        <div className="flex flex-col p-4 sm:p-5 gap-3.5">
+        <div className="flex flex-col p-4 sm:p-5 gap-4">
           {/* Quick suggestions if no messages yet */}
           {messages.length === 0 && (
             <div className="flex flex-col gap-2">
-              <p className="text-xs font-medium text-muted-foreground">Quick questions to ask:</p>
+              <p className="text-xs font-medium text-muted-foreground">Suggested questions:</p>
               <div className="flex flex-wrap gap-1.5">
                 {SUGGESTED_QUESTIONS.map((q, idx) => (
                   <button
@@ -155,37 +356,39 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
           {messages.length > 0 && (
             <div
               ref={scrollRef}
-              className="flex max-h-80 flex-col gap-3 overflow-y-auto pr-1 text-sm"
+              className="flex max-h-96 flex-col gap-4 overflow-y-auto pr-1 text-sm"
             >
               {messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`flex gap-2.5 ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  {m.role === "assistant" && (
-                    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary mt-0.5">
-                      <Bot className="size-4" />
+                <div key={m.id}>
+                  {m.role === "user" ? (
+                    <div className="flex gap-2.5 justify-end items-start">
+                      <div className="flex flex-col items-end gap-1 max-w-[85%] sm:max-w-[75%]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-muted-foreground">{m.timestamp}</span>
+                          <span className="text-[11px] font-medium text-foreground/80">You</span>
+                        </div>
+                        <div className="rounded-2xl bg-primary px-4 py-2.5 text-xs sm:text-sm font-medium text-primary-foreground shadow-xs">
+                          {m.content}
+                        </div>
+                      </div>
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground mt-1 shadow-2xs">
+                        <User className="size-3.5" />
+                      </div>
                     </div>
-                  )}
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 leading-relaxed text-xs sm:text-sm whitespace-pre-line shadow-xs ${
-                      m.role === "user"
-                        ? "bg-primary text-primary-foreground font-medium"
-                        : "bg-muted/60 text-foreground border border-border"
-                    }`}
-                  >
-                    {m.content}
-                    <div
-                      className={`mt-1 text-[10px] text-right ${
-                        m.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
-                      }`}
-                    >
-                      {m.timestamp}
-                    </div>
-                  </div>
-                  {m.role === "user" && (
-                    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground mt-0.5">
-                      <User className="size-4" />
+                  ) : (
+                    <div className="flex gap-2.5 justify-start items-start">
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary mt-1 shadow-2xs">
+                        <Sparkles className="size-3.5" />
+                      </div>
+                      <div className="flex flex-col gap-1 max-w-[92%] sm:max-w-[85%]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-semibold text-primary">Sahaara Care Assistant</span>
+                          <span className="text-[10px] text-muted-foreground">{m.timestamp}</span>
+                        </div>
+                        <div className="rounded-2xl border border-border bg-card p-4 shadow-xs">
+                          <CareAssistantMessageContent content={m.content} />
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -193,12 +396,19 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
 
               {mutation.isPending && (
                 <div className="flex gap-2.5 items-start">
-                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary mt-0.5">
-                    <Bot className="size-4 animate-spin" />
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary mt-1">
+                    <Sparkles className="size-3.5 animate-spin" />
                   </div>
-                  <div className="rounded-2xl bg-muted/60 px-4 py-3 border border-border w-2/3 flex flex-col gap-1.5">
-                    <Skeleton className="h-3 w-full" />
-                    <Skeleton className="h-3 w-4/5" />
+                  <div className="flex flex-col gap-1 max-w-[70%]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-semibold text-primary">Sahaara Care Assistant</span>
+                      <span className="text-[10px] text-muted-foreground">Checking records...</span>
+                    </div>
+                    <div className="rounded-2xl bg-card p-4 border border-border flex flex-col gap-2">
+                      <Skeleton className="h-3.5 w-full" />
+                      <Skeleton className="h-3.5 w-4/5" />
+                      <Skeleton className="h-3.5 w-3/5" />
+                    </div>
                   </div>
                 </div>
               )}
@@ -216,35 +426,28 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={`Ask about ${seniorName}'s health, today's schedule, or medicines...`}
+              placeholder={`Ask about ${cleanName}'s health, today's schedule, or medicines...`}
               disabled={mutation.isPending}
-              maxLength={500}
-              className="h-10 text-xs sm:text-sm bg-background"
+              className="flex-1 text-xs sm:text-sm bg-background border-border"
             />
             <Button
               type="submit"
+              disabled={mutation.isPending || !input.trim()}
               size="sm"
-              disabled={!input.trim() || mutation.isPending}
-              loading={mutation.isPending}
-              className="h-10 px-3.5 gap-1.5 shrink-0"
+              className="gap-1.5 px-3.5 bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              <Send className="size-4" />
+              <Send className="size-3.5" />
               <span className="hidden sm:inline">Ask</span>
             </Button>
           </form>
 
-          {/* Grounding note */}
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/40">
-            <span>Answers generated on-demand from verified care records & routine logs.</span>
-            {messages.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setMessages([])}
-                className="hover:text-foreground underline"
-              >
-                Clear chat
-              </button>
-            )}
+          {/* Clinical Safety & Privacy Footer */}
+          <div className="flex items-center justify-between border-t border-border/40 pt-2 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Clock className="size-3" />
+              Grounded in live database records
+            </span>
+            <span>Non-clinical decision support • Consult doctor for medical advice</span>
           </div>
         </div>
       )}

@@ -418,4 +418,20 @@ describe("Scenario H — Direct AI Care Q&A for Family & Coordinators", () => {
       }),
     ).toThrow();
   });
+
+  it("formats senior names respectfully and times in 12-hour AM/PM", async () => {
+    const { cleanSeniorDisplayName, formatTime12h } = await import("@/lib/ai-assistant.functions");
+
+    // Clean name
+    expect(cleanSeniorDisplayName("Synthetic Arjun 0004")).toBe("Arjun");
+    expect(cleanSeniorDisplayName("Arjun Rathore")).toBe("Arjun Rathore");
+    expect(cleanSeniorDisplayName("")).toBe("the senior");
+
+    // 12-hour time formatting
+    expect(formatTime12h("07:15:00")).toBe("7:15 AM");
+    expect(formatTime12h("08:00")).toBe("8:00 AM");
+    expect(formatTime12h("13:00:00")).toBe("1:00 PM");
+    expect(formatTime12h("20:45")).toBe("8:45 PM");
+    expect(formatTime12h(null)).toBe("All-day");
+  });
 });
