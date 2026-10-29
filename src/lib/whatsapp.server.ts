@@ -722,7 +722,7 @@ export interface TwilioLikeClient {
       body?: string;
       contentSid?: string;
       contentVariables?: string;
-    }) => Promise<{ sid: string; status?: string }>;
+    }) => Promise<{ sid: string; status?: string; body?: string | null }>;
     list?: (params?: { limit?: number }) => Promise<
       Array<{
         sid: string;
@@ -848,6 +848,7 @@ export async function sendOutboundWhatsAppMessage(
 
   let twilioSid: string;
   let twilioStatus = "sent";
+  let actualBody = bodyText;
 
   if (injectedTwilioClient) {
     const res = await injectedTwilioClient.messages.create({
@@ -857,6 +858,9 @@ export async function sendOutboundWhatsAppMessage(
     });
     twilioSid = res.sid;
     twilioStatus = res.status ?? "sent";
+    if (res.body) {
+      actualBody = res.body;
+    }
   } else if (process.env["NODE_ENV"] === "test") {
     twilioSid = "SM_mock_outbound_" + Date.now().toString(36);
     twilioStatus = "sent";
@@ -869,14 +873,25 @@ export async function sendOutboundWhatsAppMessage(
     try {
       const activeContentSid = contentSid || process.env["TWILIO_CONTENT_SID"];
       if (activeContentSid) {
-        const res = await twilioClient.messages.create({
+        const createPayload: {
+          from: string;
+          to: string;
+          contentSid: string;
+          contentVariables?: string;
+        } = {
           from: fromAddress,
           to: toAddress,
           contentSid: activeContentSid,
-          contentVariables: JSON.stringify(contentVariables || { 1: bodyText }),
-        });
+        };
+        if (contentVariables && Object.keys(contentVariables).length > 0) {
+          createPayload.contentVariables = JSON.stringify(contentVariables);
+        }
+        const res = await twilioClient.messages.create(createPayload);
         twilioSid = res.sid;
         twilioStatus = res.status ?? "sent";
+        if (res.body) {
+          actualBody = res.body;
+        }
       } else {
         const res = await twilioClient.messages.create({
           from: fromAddress,
@@ -885,6 +900,9 @@ export async function sendOutboundWhatsAppMessage(
         });
         twilioSid = res.sid;
         twilioStatus = res.status ?? "sent";
+        if (res.body) {
+          actualBody = res.body;
+        }
       }
     } catch (twilioErr: unknown) {
       const errObj = twilioErr as { code?: number; message?: string } | null;
@@ -911,7 +929,7 @@ export async function sendOutboundWhatsAppMessage(
       from_number: fromAddress.replace("whatsapp:", ""),
       to_number: toAddress.replace("whatsapp:", ""),
       message_type: "text",
-      body_text: bodyText,
+      body_text: actualBody,
       media_meta: {},
       provider_status: twilioStatus,
       processing_status: "processed",
@@ -943,7 +961,7 @@ export async function sendOutboundWhatsAppMessage(
     .from("whatsapp_conversations" as never)
     .update({
       last_message_at: new Date().toISOString(),
-      last_message_preview: bodyText.slice(0, 150),
+      last_message_preview: actualBody.slice(0, 150),
       updated_at: new Date().toISOString(),
     } as never)
     .eq("id", conv.id);
