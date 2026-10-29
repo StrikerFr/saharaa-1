@@ -24,42 +24,61 @@ export function MetricCard({
   emphasis?: boolean;
   link?: LinkProps;
 }) {
+  const isNumber = typeof value === "number";
+  const isZero = isNumber && value === 0;
+
   const body = (
-    <>
-      <span
-        className={cn(
-          "grid size-9 shrink-0 place-items-center rounded-lg",
-          emphasis ? "bg-warning-soft text-warning" : "bg-primary-soft text-primary",
+    <div className="flex w-full flex-col justify-between gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors",
+            emphasis
+              ? "bg-rose-500/15 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
+              : isZero
+                ? "bg-muted text-muted-foreground"
+                : "bg-primary-soft text-primary",
+          )}
+        >
+          <Icon className="size-4.5" aria-hidden="true" />
+        </span>
+        {link && (
+          <ChevronRight
+            className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+            aria-hidden="true"
+          />
         )}
-      >
-        <Icon className="size-[1.125rem]" aria-hidden="true" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-muted-foreground">{label}</span>
-        <span className="text-data block text-2xl leading-tight tabular-nums">{value}</span>
-        {hint && <span className="block truncate text-xs text-muted-foreground">{hint}</span>}
-      </span>
-      {link && (
-        <ChevronRight
-          className="size-4 shrink-0 self-center text-subtle-foreground"
-          aria-hidden="true"
-        />
-      )}
-    </>
+      </div>
+
+      <div>
+        <div className="text-2xl font-bold tracking-tight text-foreground font-display tabular-nums sm:text-3xl">
+          {value}
+        </div>
+        <div className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </div>
+        {hint && (
+          <div className="mt-1 text-xs text-muted-foreground/80 leading-snug">
+            {hint}
+          </div>
+        )}
+      </div>
+    </div>
   );
-  const cls = "surface flex min-w-0 items-start gap-3 p-4";
+
+  const cardStyle = cn(
+    "group relative flex min-w-0 flex-col rounded-2xl border p-4 transition-all duration-200",
+    emphasis
+      ? "border-rose-400/50 bg-rose-500/[0.04] shadow-xs hover:border-rose-500/70 hover:shadow-sm dark:bg-rose-500/[0.08]"
+      : "border-border/80 bg-card shadow-xs hover:border-primary/40 hover:bg-card/90 hover:shadow-sm",
+  );
+
   return link ? (
-    <Link
-      {...link}
-      className={cn(
-        cls,
-        "transition-standard hover:border-primary/40 hover:bg-secondary/40 focus-visible:outline-2 focus-visible:outline-ring",
-      )}
-    >
+    <Link {...link} className={cardStyle}>
       {body}
     </Link>
   ) : (
-    <div className={cls}>{body}</div>
+    <div className={cardStyle}>{body}</div>
   );
 }
 
@@ -68,7 +87,7 @@ export function MetricGrid({ children, label }: { children: ReactNode; label: st
     <div
       role="list"
       aria-label={label}
-      className="grid gap-3 [&>*]:min-w-0 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"
+      className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
     >
       {children}
     </div>

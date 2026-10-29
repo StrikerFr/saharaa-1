@@ -42,7 +42,7 @@ export function TaskList({
   showSenior?: boolean | undefined;
 }) {
   return (
-    <ul className="surface divide-y divide-border">
+    <ul className="flex flex-col gap-3.5">
       {tasks.map((t) => (
         <TaskRow key={t.id} task={t} showSenior={showSenior} />
       ))}
@@ -77,57 +77,84 @@ function TaskRow({ task, showSenior }: { task: TaskListRow; showSenior?: boolean
   );
 
   return (
-    <li className="flex flex-col gap-2 px-4 py-4">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="font-semibold">{task.title}</span>
-        <StatusBadge tone={s.tone}>{s.label}</StatusBadge>
-        {overdue && <StatusBadge tone="critical">Overdue</StatusBadge>}
-        {!overdue && task.dueSoon && <StatusBadge tone="warning">Due soon</StatusBadge>}
+    <li className="flex flex-col gap-3 rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-all duration-200 hover:border-primary/40 hover:shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3 min-w-0">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary mt-0.5">
+            <CalendarClock className="size-4.5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-base font-bold text-foreground">
+                {task.title}
+              </span>
+              <StatusBadge tone={s.tone}>{s.label}</StatusBadge>
+              {overdue && <StatusBadge tone="critical">Overdue</StatusBadge>}
+              {!overdue && task.dueSoon && <StatusBadge tone="warning">Due soon</StatusBadge>}
+            </div>
+
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              {showSenior && task.seniorName && (
+                <Link
+                  to="/seniors/$seniorId"
+                  params={{ seniorId: task.senior_id }}
+                  className="font-semibold text-primary hover:underline"
+                >
+                  {task.seniorName}
+                </Link>
+              )}
+              {task.due_at && (
+                <span className={overdue ? "font-semibold text-rose-600 dark:text-rose-400" : ""}>
+                  Due: {formatWhen(task.due_at)}
+                </span>
+              )}
+              {task.assigneeName && (
+                <span>Assigned to {task.assigneeName}</span>
+              )}
+              {task.completed_at && (
+                <span>Completed: {formatWhen(task.completed_at)}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {next.length > 0 && (
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
+            {next.map((to) => (
+              <Button
+                key={to}
+                size="sm"
+                variant={to === "completed" ? "default" : to === "cancelled" ? "ghost" : "outline"}
+                className={to === "completed" ? "h-8 bg-emerald-700 text-white hover:bg-emerald-800" : "h-8"}
+                onClick={() => {
+                  setNote("");
+                  setConfirm(to);
+                }}
+              >
+                {to === "in_progress"
+                  ? "Start"
+                  : to === "open"
+                    ? "Reopen"
+                    : to === "completed"
+                      ? "Mark Completed"
+                      : "Cancel"}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
-      <p className="text-sm text-muted-foreground">
-        {showSenior && task.seniorName ? (
-          <>
-            <Link
-              to="/seniors/$seniorId"
-              params={{ seniorId: task.senior_id }}
-              className="font-medium underline-offset-2 hover:underline"
-            >
-              {task.seniorName}
-            </Link>
-            {" · "}
-          </>
-        ) : null}
-        {task.due_at ? `Due ${formatWhen(task.due_at)}` : "No due date"}
-        {task.assigneeName ? ` · Assigned to ${task.assigneeName}` : ""}
-        {task.completed_at ? ` · Completed ${formatWhen(task.completed_at)}` : ""}
-      </p>
-      {task.notes && <p className="text-sm">{task.notes}</p>}
-      {task.outcome_note && (
-        <p className="text-sm">
-          <span className="font-semibold">Outcome:</span> {task.outcome_note}
-        </p>
+
+      {task.notes && (
+        <div className="rounded-xl bg-muted/50 px-3.5 py-2.5 text-xs text-foreground/90 border border-border/40">
+          <span className="font-semibold text-muted-foreground">Clinical notes: </span>
+          {task.notes}
+        </div>
       )}
-      {next.length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-1">
-          {next.map((to) => (
-            <Button
-              key={to}
-              size="sm"
-              variant={to === "cancelled" ? "outline" : "secondary"}
-              onClick={() => {
-                setNote("");
-                setConfirm(to);
-              }}
-            >
-              {to === "in_progress"
-                ? "Start"
-                : to === "open"
-                  ? "Reopen"
-                  : to === "completed"
-                    ? "Complete"
-                    : "Cancel"}
-            </Button>
-          ))}
+
+      {task.outcome_note && (
+        <div className="rounded-xl bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-900 dark:text-emerald-200 border border-emerald-500/20">
+          <span className="font-semibold">Recorded Outcome: </span>
+          {task.outcome_note}
         </div>
       )}
 

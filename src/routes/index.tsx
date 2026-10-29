@@ -69,7 +69,7 @@ function Overview() {
       <Page
         eyebrow={new Intl.DateTimeFormat("en-IN", { dateStyle: "full" }).format(new Date())}
         title="Overview"
-        description="What needs your team's attention right now. Every count below comes from your organisation's records."
+        description="Care coordination dashboard. Monitor senior vitals, open alerts, and active follow-up tasks."
         actions={
           <Button asChild>
             <Link to="/seniors">
@@ -95,15 +95,15 @@ function Dashboard() {
 
   return (
     <>
-      <Section title="Workload" description="Select a tile to open the matching queue.">
+      <Section title="Workload" description="Caseload overview and team operational queues.">
         {summary.isPending ? (
           <div
-            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"
+            className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
             role="status"
             aria-label="Loading the workload summary"
           >
             {Array.from({ length: 6 }, (_, i) => (
-              <Skeleton key={i} className="h-[5.5rem] rounded-xl" />
+              <Skeleton key={i} className="h-28 rounded-2xl" />
             ))}
           </div>
         ) : summary.isError ? (
@@ -119,8 +119,8 @@ function Dashboard() {
       </Section>
 
       <Section
-        title="Needs attention"
-        description="Open review cases, ordered by the assessment's review category. Ordering is operational — it never changes the assessment itself."
+        title="Active care alerts"
+        description="Seniors with recent changes in vitals, medication, or routine requiring coordinator review."
         action={
           <Button asChild variant="ghost" size="sm">
             <Link to="/alerts">
@@ -198,38 +198,44 @@ function RecentActivity() {
     },
   });
   return (
-    <section className="surface flex min-w-0 flex-col gap-3 p-4 sm:p-5" aria-labelledby="recent-h">
+    <section className="flex min-w-0 flex-col gap-4 rounded-2xl border border-border/80 bg-card p-5 shadow-xs" aria-labelledby="recent-h">
       <div>
-        <h3 id="recent-h" className="font-semibold">
+        <h3 id="recent-h" className="font-bold text-base text-foreground">
           Recent observations
         </h3>
-        <p className="text-sm text-muted-foreground">Latest entries across your organisation.</p>
+        <p className="text-xs text-muted-foreground">Latest care readings recorded across your organisation.</p>
       </div>
       {q.isPending ? (
-        <Skeleton className="h-48" />
+        <Skeleton className="h-48 rounded-xl" />
       ) : q.isError ? (
         <Notice tone="critical" title="Couldn't load recent activity." />
       ) : q.data.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nothing recorded yet.</p>
+        <p className="text-sm text-muted-foreground py-4 text-center">No observations recorded yet.</p>
       ) : (
-        <ol className="flex flex-col">
+        <ol className="flex flex-col divide-y divide-border/60">
           {q.data.map((o) => {
             const Icon = OBSERVATION_ICON[o.type];
             return (
-              <li key={o.id} className="flex gap-3 border-t border-border py-2.5 first:border-t-0">
-                <Icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+              <li key={o.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Icon className="size-3.5" aria-hidden="true" />
+                </span>
                 <div className="min-w-0 flex-1 text-sm">
-                  <p className="truncate">
-                    <Link
-                      to="/seniors/$seniorId"
-                      params={{ seniorId: o.senior_id }}
-                      className="font-semibold hover:underline"
-                    >
-                      {o.seniors?.display_name ?? "Senior"}
-                    </Link>{" "}
-                    · {OBSERVATION_TYPES[o.type].label}:{" "}
-                    <span className="text-data font-normal">{formatObservationValue(o)}</span>
-                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-1">
+                    <p className="truncate font-medium text-foreground">
+                      <Link
+                        to="/seniors/$seniorId"
+                        params={{ seniorId: o.senior_id }}
+                        className="hover:text-primary hover:underline"
+                      >
+                        {o.seniors?.display_name ?? "Senior"}
+                      </Link>
+                      <span className="text-muted-foreground font-normal"> · {OBSERVATION_TYPES[o.type].label}</span>
+                    </p>
+                    <span className="rounded-md bg-secondary/80 px-2 py-0.5 text-xs font-semibold text-foreground font-mono">
+                      {formatObservationValue(o)}
+                    </span>
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {formatInZone(o.observed_at, browserZone())}
                     {o.verification === "unverified" && " · Unverified"}

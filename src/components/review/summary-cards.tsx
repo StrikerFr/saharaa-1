@@ -13,38 +13,44 @@ import type { OperationsSummary } from "@/lib/review";
 const CARDS = [
   {
     key: "awaitingReview",
-    label: "Awaiting review",
-    help: "Cases no coordinator has started reviewing",
+    label: "Needs review",
+    shortHelp: "Unassigned alerts",
+    help: "Cases waiting for coordinator review",
     icon: ClipboardList,
   },
   {
     key: "inReview",
     label: "In review",
-    help: "Cases a coordinator is actively reviewing",
+    shortHelp: "Being handled",
+    help: "Cases currently under coordinator review",
     icon: Eye,
   },
   {
     key: "followUpRequired",
-    label: "Follow-up required",
-    help: "Reviewed cases waiting on a follow-up outcome",
+    label: "Follow-up needed",
+    shortHelp: "Action pending",
+    help: "Reviewed cases waiting on care actions",
     icon: SearchCheck,
   },
   {
     key: "overdueTasks",
-    label: "Overdue follow-ups",
-    help: "Open tasks past their due time",
+    label: "Overdue tasks",
+    shortHelp: "Past deadline",
+    help: "Open follow-up tasks past their due time",
     icon: AlertTriangle,
   },
   {
     key: "dueSoonTasks",
     label: "Due in 48 hours",
+    shortHelp: "Upcoming tasks",
     help: "Open tasks due within the next two days",
     icon: CalendarClock,
   },
   {
     key: "insufficientOrStale",
-    label: "Insufficient or stale data",
-    help: "Active cases whose latest assessment is over 7 days old or had insufficient data",
+    label: "Stale / low data",
+    shortHelp: "Need fresh vitals",
+    help: "Active cases whose latest assessment is over 7 days old or has low data",
     icon: FileWarning,
   },
 ] as const;
@@ -66,7 +72,7 @@ export function SummaryCards({ summary }: { summary: OperationsSummary }) {
               icon={c.icon}
               label={c.label}
               value={value}
-              hint={c.help}
+              hint={c.shortHelp}
               emphasis={attention}
               link={link}
             />

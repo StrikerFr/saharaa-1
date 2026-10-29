@@ -2,7 +2,18 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { BellRing, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  BellRing,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  HeartPulse,
+  Pill,
+  Search,
+  UserCheck,
+} from "lucide-react";
 
 import { CaseDetail } from "@/components/review/case-detail";
 import { CareAccessGate } from "@/components/seniors/access-gate";
@@ -335,45 +346,82 @@ function AlertItem({
   const closed = isCaseClosed(r.status);
   const err = assignMut.error ?? reopenMut.error;
 
+  const initials = r.seniorName
+    .replace(/^Synthetic\s+/i, "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase() || "S";
+
   return (
-    <li className="rounded-2xl border border-border bg-card p-5">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0 flex flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              to="/seniors/$seniorId"
-              params={{ seniorId: r.seniorId }}
-              className="text-card-title underline-offset-2 hover:underline focus-visible:underline"
-            >
-              {r.seniorName}
-            </Link>
-            <span className="text-sm text-muted-foreground">{r.recordCode}</span>
-            {r.isSynthetic && <StatusBadge tone="neutral">Synthetic test record</StatusBadge>}
+    <li className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition-all duration-200 hover:border-primary/40 hover:shadow-sm">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 flex items-start gap-3.5">
+          {/* Senior Avatar */}
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 font-bold text-sm mt-0.5">
+            {initials}
+          </span>
+
+          <div className="min-w-0 flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                to="/seniors/$seniorId"
+                params={{ seniorId: r.seniorId }}
+                className="text-base font-bold text-foreground hover:text-primary transition-colors hover:underline"
+              >
+                {r.seniorName}
+              </Link>
+              <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
+                {r.recordCode}
+              </span>
+              {r.isSynthetic && (
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  Synthetic Record
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge tone={p.tone}>{p.label}</StatusBadge>
+              <StatusBadge tone={CASE_STATUS_LABEL[r.status].tone}>
+                {ALERT_STATUS_LABEL[r.status]}
+              </StatusBadge>
+            </div>
+
+            <p className="text-sm text-foreground/90 leading-relaxed">
+              {explainAlert({
+                priority: r.priority,
+                dataQuality: r.dataQuality,
+                changedDomains: r.changedDomains,
+                domainLabel,
+              })}
+            </p>
+
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground border-t border-border/40 pt-2 mt-1">
+              <span className="inline-flex items-center gap-1">
+                <Clock className="size-3.5" aria-hidden="true" />
+                Raised {when(r.openedAt)}
+              </span>
+              <span>· Assessment {when(r.assessedAt)}</span>
+              {r.assignedTo ? (
+                <span className="font-medium text-foreground/80">
+                  · Assigned to {r.assigneeName ?? "a coordinator"}
+                </span>
+              ) : (
+                <span className="text-amber-600 dark:text-amber-400">· Unassigned</span>
+              )}
+            </div>
+
+            <div className="rounded-xl bg-primary/5 border border-primary/15 px-3 py-1.5 text-xs font-medium text-primary-foreground/90 dark:text-primary mt-0.5 inline-flex items-center gap-1.5 self-start">
+              <span className="font-bold text-primary">Recommended Action:</span>{" "}
+              {nextAlertStep(r.status, !!r.assignedTo)}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <StatusBadge tone={p.tone}>{p.label}</StatusBadge>
-            <StatusBadge tone={CASE_STATUS_LABEL[r.status].tone}>
-              {ALERT_STATUS_LABEL[r.status]}
-            </StatusBadge>
-          </div>
-          <p className="text-sm">
-            {explainAlert({
-              priority: r.priority,
-              dataQuality: r.dataQuality,
-              changedDomains: r.changedDomains,
-              domainLabel,
-            })}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Raised {when(r.openedAt)} · Updated {when(r.updatedAt)} · Assessment{" "}
-            {when(r.assessedAt)} ·{" "}
-            {r.assignedTo ? `Assigned to ${r.assigneeName ?? "a coordinator"}` : "Unassigned"}
-          </p>
-          <p className="text-sm font-medium">
-            Next step: {nextAlertStep(r.status, !!r.assignedTo)}
-          </p>
         </div>
-        <div className="flex flex-wrap gap-2 md:justify-end">
+
+        <div className="flex flex-wrap gap-2 md:justify-end shrink-0 pt-1">
           {!closed && r.assignedTo !== userId && (
             <Button
               variant="outline"

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { ageFrom, CARE_STATUS, DIRECTORY_PAGE_SIZE, sanitizeSearch } from "@/lib/seniors";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/seniors/")({
   head: () => ({
@@ -121,32 +122,68 @@ function Directory() {
         </EmptyState>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
-            {total} {total === 1 ? "record" : "records"}
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1" role="status" aria-live="polite">
+            {total} {total === 1 ? "senior profile" : "senior profiles"} registered
             {q ? ` matching "${q}"` : ""}
           </p>
-          <ul className="surface divide-y divide-border" aria-busy={list.isFetching}>
+          <ul className="flex flex-col gap-3" aria-busy={list.isFetching}>
             {list.data.rows.map((s) => {
               const age = ageFrom(s.date_of_birth);
+              const initials = s.display_name
+                .replace(/^Synthetic\s+/i, "")
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((p) => p[0])
+                .join("")
+                .toUpperCase() || "S";
+
               return (
                 <li key={s.id}>
                   <Link
                     to="/seniors/$seniorId"
                     params={{ seniorId: s.id }}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-4 transition-standard hover:bg-secondary/60 focus-visible:bg-secondary/60"
+                    className="group relative flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-all duration-200 hover:border-primary/50 hover:bg-card/90 hover:shadow-md focus-visible:outline-2 focus-visible:outline-ring"
                   >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">{s.display_name}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {s.record_code}
-                        {age != null ? ` · ${age} yrs` : ""}
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 font-bold text-sm">
+                        {initials}
                       </span>
-                    </span>
-                    {s.is_synthetic && <StatusBadge tone="neutral">Synthetic</StatusBadge>}
-                    <StatusBadge tone={s.care_status === "active" ? "success" : "neutral"}>
-                      {CARE_STATUS[s.care_status]}
-                    </StatusBadge>
-                    <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-base font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                            {s.display_name}
+                          </span>
+                          <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
+                            {s.record_code}
+                          </span>
+                          {s.is_synthetic && (
+                            <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                              Synthetic
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {age != null ? `${age} years old` : "Age not specified"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold border",
+                          s.care_status === "active"
+                            ? "bg-emerald-500/10 text-emerald-800 border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            : "bg-muted text-muted-foreground border-transparent",
+                        )}
+                      >
+                        {CARE_STATUS[s.care_status]}
+                      </span>
+                      <span className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-primary transition-transform group-hover:translate-x-1">
+                        View Profile <ChevronRight className="size-4" aria-hidden="true" />
+                      </span>
+                    </div>
                   </Link>
                 </li>
               );

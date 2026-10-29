@@ -171,18 +171,18 @@ export function AlertsPopupNotifier() {
     <div
       role="region"
       aria-label="Active care alerts banner"
-      className="sticky top-0 z-[var(--z-header)] flex items-center justify-between gap-3 border-b border-amber-500/30 bg-amber-50/95 px-4 py-2.5 text-amber-950 backdrop-blur dark:bg-amber-950/40 dark:text-amber-200"
+      className="sticky top-0 z-[var(--z-header)] flex items-center justify-between gap-3 border-b border-amber-200/60 bg-amber-500/10 px-4 py-2 text-amber-900 backdrop-blur-md dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200"
     >
-      <div className="flex min-w-0 items-center gap-2.5 text-sm font-medium">
-        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white dark:bg-amber-400 dark:text-black">
-          <AlertTriangle className="size-3.5" aria-hidden="true" />
+      <div className="flex min-w-0 items-center gap-2.5 text-xs sm:text-sm font-medium">
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white dark:bg-amber-400 dark:text-black">
+          <AlertTriangle className="size-3" aria-hidden="true" />
         </span>
         <span className="truncate">
-          <strong>{activeCount} active care alerts</strong> require review (missed medicines, vitals changes or mobility decline).
+          <strong>{activeCount} active care alerts</strong> require review for changes in vitals, medication, or routine.
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <Button asChild size="sm" variant="default" className="h-7 bg-amber-700 text-white hover:bg-amber-800 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400">
+        <Button asChild size="sm" variant="default" className="h-7 rounded-lg bg-amber-700 px-3 text-xs font-semibold text-white shadow-xs hover:bg-amber-800 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400">
           <Link to="/alerts">
             Open Alerts <ChevronRight className="size-3.5" aria-hidden="true" />
           </Link>
@@ -190,7 +190,7 @@ export function AlertsPopupNotifier() {
         <button
           type="button"
           onClick={() => setBannerDismissed(true)}
-          className="rounded p-1 text-amber-800 transition-colors hover:bg-amber-200/50 dark:text-amber-300 dark:hover:bg-amber-800/50"
+          className="rounded-lg p-1 text-amber-800 transition-colors hover:bg-amber-200/50 dark:text-amber-300 dark:hover:bg-amber-800/50"
           aria-label="Dismiss alert banner for this session"
         >
           <X className="size-4" aria-hidden="true" />
