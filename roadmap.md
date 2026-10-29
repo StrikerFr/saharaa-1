@@ -57,3 +57,16 @@
 - [x] Schema supabase/phase8_routine.sql, pure logic + 7 tests, Today & routine tab (checklist, add/edit items, AI-suggested updates, 7-day chart)
 - [ ] BLOCKED (user): run supabase/phase8_routine.sql in the SQL editor
 - [ ] Later: WhatsApp bot + call channel writing via log_routine (source whatsapp/call)
+
+## Phase 9 — Secure Family Portal & Voice Notes
+- [x] Schema `supabase/phase9_family_portal.sql` + `supabase/tests/rls_phase9.sql` (single-use cryptographic invitations, least-privilege family access grants, `follow_up_tasks` family visibility).
+- [x] Domain types and contracts `src/lib/family.ts` + 21 unit & validation tests in `src/test/family.test.ts`.
+- [x] Server functions `src/lib/family.functions.ts` (`listFamilySeniors`, `getFamilyDashboard`, `submitFamilyReport`, `respondFamilyTask`, `createFamilyInvitation`, `acceptFamilyInvitation`, `listSeniorFamilyMembers`, `revokeFamilyAccess`).
+- [x] Browser voice note recorder `src/components/reports/voice-recorder.tsx` (MediaRecorder API, timer, preview player, 4MB Vercel cap, audio signature validation).
+- [x] Groq Whisper STT + pre-submission transcript review & editing `src/components/family/family-report-modal.tsx`.
+- [x] Dedicated Family Portal route `src/routes/_authenticated/family.tsx` (senior switcher, verified vitals timeline, care team follow-up responder, submission history with status tracking, ElevenLabs TTS).
+- [x] Single-use invitation acceptance route `src/routes/_authenticated/invite.tsx`.
+- [x] Coordinator family manager embedded in senior profile tabs `src/routes/_authenticated/seniors.$seniorId.index.tsx` (`Family & Caregivers` tab).
+- [x] Navigation updated: `Family Portal` destination added in `src/lib/navigation.ts`.
+- [x] Verified: 180/180 Vitest passing, `tsc --noEmit` clean, production build `.vercel/output` succeeded.
+- [ ] Next step (user): run `supabase/phase9_family_portal.sql` in the Supabase SQL editor to deploy live tables & RLS.

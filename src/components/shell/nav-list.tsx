@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 
 import { isNavActive, type NavItem } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
+import { useActiveAlertsCount } from "./alerts-popup-notifier";
 
 const itemBase =
   "flex min-h-11 items-center gap-3 rounded-lg px-3 text-[0.9375rem] transition-standard";
@@ -16,6 +17,7 @@ export function NavList({
   onNavigate?: (() => void) | undefined;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const alertsCount = useActiveAlertsCount();
 
   return (
     <div>
@@ -40,6 +42,7 @@ export function NavList({
             );
           }
           const active = isNavActive(item.to, pathname);
+          const hasBadge = item.label === "Alerts" && alertsCount > 0;
           return (
             <li key={item.label}>
               <Link
@@ -55,7 +58,12 @@ export function NavList({
                 )}
               >
                 <Icon className="size-[1.125rem] shrink-0" aria-hidden="true" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {hasBadge && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-bold text-destructive-foreground">
+                    {alertsCount}
+                  </span>
+                )}
               </Link>
             </li>
           );

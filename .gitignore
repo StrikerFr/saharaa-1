@@ -38,6 +38,7 @@ synthetic-output/
 
 # Local environment (deployment env vars live in Vercel project settings)
 .env
+env
 
 # Vercel CLI state (builds are produced on Vercel itself)
 .vercel/

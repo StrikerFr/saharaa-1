@@ -3,6 +3,7 @@ import {
   BellRing,
   CalendarCheck,
   FileBarChart,
+  HeartHandshake,
   KeyRound,
   LayoutDashboard,
   MessagesSquare,
@@ -31,7 +32,8 @@ export type NavItem =
         | "/follow-ups"
         | "/alerts"
         | "/messages"
-        | "/reports";
+        | "/reports"
+        | "/family";
       requiresRole?: AppRole;
     }
   | { label: string; icon: LucideIcon; status: "planned"; phase: number };
@@ -43,6 +45,7 @@ export const primaryNav: NavItem[] = [
   { label: "Follow-ups", icon: CalendarCheck, status: "available", to: "/follow-ups" },
   { label: "Messages", icon: MessagesSquare, status: "available", to: "/messages" },
   { label: "Reports", icon: FileBarChart, status: "available", to: "/reports" },
+  { label: "Family Portal", icon: HeartHandshake, status: "available", to: "/family" },
 ];
 
 export const secondaryNav: NavItem[] = [

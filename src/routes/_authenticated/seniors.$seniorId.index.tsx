@@ -18,6 +18,7 @@ import {
 import { CaseDetail } from "@/components/review/case-detail";
 import { OpenCaseButton } from "@/components/review/review-actions";
 import { ReportsSection } from "@/components/reports/reports-section";
+import { SeniorFamilyManager } from "@/components/seniors/senior-family-manager";
 import { AssessmentPanel } from "@/components/seniors/assessment-panel";
 import { CareAccessGate } from "@/components/seniors/access-gate";
 import { RecordBaseline } from "@/components/seniors/record-baseline";
@@ -55,7 +56,7 @@ import {
   type ObservationRow,
 } from "@/lib/seniors";
 
-const TABS = ["overview", "today", "observations", "alerts", "reports"] as const;
+const TABS = ["overview", "today", "observations", "alerts", "reports", "family"] as const;
 type Tab = (typeof TABS)[number];
 
 export const Route = createFileRoute("/_authenticated/seniors/$seniorId/")({
@@ -226,6 +227,9 @@ function Profile({ s, seniorId }: { s: SeniorRecord; seniorId: string }) {
           <TabsTrigger value="reports" className="min-h-10 px-4">
             Reports & AI review
           </TabsTrigger>
+          <TabsTrigger value="family" className="min-h-10 px-4">
+            Family & Caregivers
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="flex flex-col gap-8">
@@ -284,6 +288,10 @@ function Profile({ s, seniorId }: { s: SeniorRecord; seniorId: string }) {
 
         <TabsContent value="reports" className="flex flex-col gap-8">
           <ReportsSection seniorId={seniorId} timeZone={tz} />
+        </TabsContent>
+
+        <TabsContent value="family" className="flex flex-col gap-8">
+          <SeniorFamilyManager seniorId={seniorId} seniorName={s.display_name} />
         </TabsContent>
       </Tabs>
     </Page>

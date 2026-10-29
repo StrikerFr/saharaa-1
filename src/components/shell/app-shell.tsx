@@ -17,6 +17,7 @@ import { primaryNav, secondaryNav, visibleNav } from "@/lib/navigation";
 import { Wordmark } from "./brand";
 import { NavList } from "./nav-list";
 import { OrgSwitcher } from "./org-switcher";
+import { AlertsPopupNotifier } from "./alerts-popup-notifier";
 
 function SessionControl({ onNavigate }: { onNavigate?: (() => void) | undefined }) {
   const { session, ready } = useSession();
@@ -127,6 +128,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <main id="main" tabIndex={-1} className="outline-none lg:pl-[var(--sidebar-width)]">
+        <AlertsPopupNotifier />
         {children}
       </main>
     </div>
