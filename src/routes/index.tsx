@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -9,7 +10,7 @@ import { CareAccessGate } from "@/components/seniors/access-gate";
 import { Page, Section } from "@/components/shell/page";
 import { EmptyState, Notice } from "@/components/shell/states";
 import { Button } from "@/components/ui/button";
-import { useSession } from "@/hooks/use-session";
+import { useMyRoles, useSession } from "@/hooks/use-session";
 import { DailyVolumeCard } from "@/components/charts/daily-volume";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,11 +47,24 @@ export const Route = createFileRoute("/")({
 
 function Overview() {
   const { session, ready } = useSession();
+  const roles = useMyRoles(session?.user?.id);
+  const r = roles.data ?? [];
+  const isFamilyOnly = r.includes("family") && !r.includes("coordinator") && !r.includes("admin");
+  const navigate = Route.useNavigate();
+
+  useEffect(() => {
+    if (ready && session?.user && isFamilyOnly) {
+      navigate({ to: "/family", replace: true });
+    }
+  }, [ready, session, isFamilyOnly, navigate]);
 
   // Signed-in coordinators get the operations dashboard; everyone else sees
   // the honest setup page. The session is client-side only, so the dashboard
   // renders after hydration — authorization itself is enforced server-side.
   if (ready && session?.user) {
+    if (isFamilyOnly) {
+      return null;
+    }
     return (
       <Page
         eyebrow={new Intl.DateTimeFormat("en-IN", { dateStyle: "full" }).format(new Date())}

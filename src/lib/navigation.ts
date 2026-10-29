@@ -61,9 +61,21 @@ export const secondaryNav: NavItem[] = [
 ];
 
 export function visibleNav(items: NavItem[], roles: readonly AppRole[]): NavItem[] {
-  return items.filter(
-    (i) => i.status !== "available" || !i.requiresRole || roles.includes(i.requiresRole),
-  );
+  const isFamilyOnly = roles.includes("family") && !roles.includes("coordinator") && !roles.includes("admin");
+
+  return items.filter((i) => {
+    if (i.status !== "available") return true;
+
+    // Pure family caregivers only see the family portal and their account
+    if (isFamilyOnly) {
+      return i.to === "/family" || i.to === "/account";
+    }
+
+    if (i.requiresRole && !roles.includes(i.requiresRole)) {
+      return false;
+    }
+    return true;
+  });
 }
 
 export function isNavActive(itemTo: string, pathname: string): boolean {

@@ -61,15 +61,25 @@ function NavContent({ onNavigate }: { onNavigate?: (() => void) | undefined }) {
   const { session } = useSession();
   const roles = useMyRoles(session?.user.id);
   const r = roles.data ?? [];
+  const isFamilyOnly = r.includes("family") && !r.includes("coordinator") && !r.includes("admin");
+
   return (
     <div className="flex flex-1 flex-col gap-8">
-      <NavList items={visibleNav(primaryNav, r)} label="Care" onNavigate={onNavigate} />
-      <NavList items={visibleNav(secondaryNav, r)} label="Workspace" onNavigate={onNavigate} />
+      <NavList
+        items={visibleNav(primaryNav, r)}
+        label={isFamilyOnly ? "Family Portal" : "Care"}
+        onNavigate={onNavigate}
+      />
+      {!isFamilyOnly && (
+        <NavList items={visibleNav(secondaryNav, r)} label="Workspace" onNavigate={onNavigate} />
+      )}
       <div className="mt-auto flex flex-col gap-4">
-        {session && <OrgSwitcher userId={session.user.id} isAdmin={r.includes("admin")} />}
+        {session && !isFamilyOnly && <OrgSwitcher userId={session.user.id} isAdmin={r.includes("admin")} />}
         <SessionControl onNavigate={onNavigate} />
         <p className="rounded-lg bg-background-subtle p-3 text-sm text-muted-foreground">
-          Sahaara supports coordinators. It does not diagnose or replace clinical or emergency care.
+          {isFamilyOnly
+            ? "Sahaara helps families stay connected with care coordinators and seniors."
+            : "Sahaara supports coordinators. It does not diagnose or replace clinical or emergency care."}
         </p>
       </div>
     </div>
@@ -78,6 +88,10 @@ function NavContent({ onNavigate }: { onNavigate?: (() => void) | undefined }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const { session } = useSession();
+  const roles = useMyRoles(session?.user?.id);
+  const r = roles.data ?? [];
+  const isFamilyOnly = r.includes("family") && !r.includes("coordinator") && !r.includes("admin");
 
   return (
     <div className="min-h-dvh bg-background">
@@ -92,7 +106,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="fixed inset-y-0 left-0 hidden w-[var(--sidebar-width)] flex-col gap-8 border-r border-sidebar-border bg-sidebar px-4 py-6 lg:flex"
         aria-label="Primary"
       >
-        <Link to="/" className="rounded-lg px-2" aria-label="Sahaara home">
+        <Link to={isFamilyOnly ? "/family" : "/"} className="rounded-lg px-2" aria-label="Sahaara home">
           <Wordmark />
         </Link>
         <nav aria-label="Main navigation" className="flex flex-1 flex-col">
@@ -101,7 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <header className="sticky top-0 z-[var(--z-header)] flex h-[var(--header-height)] items-center justify-between border-b border-border bg-background/95 px-[var(--page-pad-x)] lg:hidden">
-        <Link to="/" className="rounded-lg" aria-label="Sahaara home">
+        <Link to={isFamilyOnly ? "/family" : "/"} className="rounded-lg" aria-label="Sahaara home">
           <Wordmark />
         </Link>
         <Sheet open={open} onOpenChange={setOpen}>
@@ -128,7 +142,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <main id="main" tabIndex={-1} className="outline-none lg:pl-[var(--sidebar-width)]">
-        <AlertsPopupNotifier />
+        {!isFamilyOnly && <AlertsPopupNotifier />}
         {children}
       </main>
     </div>

@@ -50,14 +50,8 @@ export async function assertFamilyOrCoordAccess(
 ): Promise<{ isCoordinator: boolean; isFamily: boolean; relationship?: string }> {
   const db = untyped(supabase);
 
-  // 1. Check coordinator / admin access
-  const coordCheck = await db.rpc("can_access_senior", { _senior: seniorId });
-  if (coordCheck.data === true) {
-    return { isCoordinator: true, isFamily: true, relationship: "Care Coordinator" };
-  }
-
-  // 2. Check family grant table
-  const { data: grant, error } = await db
+  // 1. Check explicit family grant table first (e.g. Daughter, Son, Spouse)
+  const { data: grant } = await db
     .from("senior_family_members")
     .select("id, relationship_label, status, expires_at")
     .eq("senior_id", seniorId)
@@ -69,16 +63,24 @@ export async function assertFamilyOrCoordAccess(
     return { isCoordinator: false, isFamily: true, relationship: grant.relationship_label };
   }
 
-  // Fallback: check if table doesn't exist yet and user has family role
-  if (error && (error.message.includes("does not exist") || error.message.includes("Could not find") || (error as any).code === "PGRST205")) {
-    const { data: roles } = await db
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    const hasFamilyRole = roles?.some((r: any) => r.role === "family");
-    if (hasFamilyRole) {
-      return { isCoordinator: false, isFamily: true, relationship: "Family Member" };
+  // 2. Check coordinator / admin permissions
+  const { data: roles } = await db.from("user_roles").select("role").eq("user_id", userId);
+  const isCoordOrAdmin = roles?.some((r: any) => r.role === "coordinator" || r.role === "admin");
+
+  if (isCoordOrAdmin) {
+    const { data: senior } = await db.from("seniors").select("org_id").eq("id", seniorId).maybeSingle();
+    if (senior) {
+      const orgCheck = await db.rpc("can_access_org", { _org: senior.org_id });
+      if (orgCheck.data === true) {
+        return { isCoordinator: true, isFamily: true, relationship: "Care Coordinator" };
+      }
     }
+  }
+
+  // 3. Fallback: check if user has family role
+  const hasFamilyRole = roles?.some((r: any) => r.role === "family");
+  if (hasFamilyRole) {
+    return { isCoordinator: false, isFamily: true, relationship: "Family Member" };
   }
 
   throw new Error("You do not have authorized family access to this senior.");
