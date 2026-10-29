@@ -3,8 +3,7 @@
 // Follows Sahaara care-safety rules: no fake IDs, no unverified assumptions, no plaintext secrets.
 
 import { z } from "zod";
-import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
-import { normalizePhoneNumber } from "./twilio.server";
+import { normalizePhoneNumber } from "./phone";
 
 // =========================================================================
 // 1. Domain Constants & Types
@@ -167,28 +166,121 @@ export type RevokeWhatsAppIdentityInput = z.infer<typeof revokeWhatsAppIdentityI
  * Generates a random cryptographic hex salt.
  */
 export function generateSalt(byteLength = 16): string {
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    const bytes = new Uint8Array(byteLength);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-  }
-  return randomBytes(byteLength).toString("hex");
+  const bytes = new Uint8Array(byteLength);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**
  * Generates a cryptographically random 6-digit numeric PIN.
  */
 export function generateSixDigitPin(): string {
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    const randomUint32 = new Uint32Array(1);
-    crypto.getRandomValues(randomUint32);
-    const val = randomUint32[0] ?? 0;
-    const num = (val % 900000) + 100000;
-    return num.toString();
+  const randomUint32 = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(randomUint32);
+  const val = randomUint32[0] ?? 0;
+  const num = (val % 900000) + 100000;
+  return num.toString();
+}
+
+
+/**
+ * Pure, isomorphic SHA-256 implementation.
+ * Zero Node.js or browser-specific dependencies.
+ */
+function sha256Hex(input: string): string {
+  const bytes = new TextEncoder().encode(input);
+  const mathPow = Math.pow;
+  const maxWord = mathPow(2, 32);
+  const words: number[] = [];
+  const bitLength = bytes.length * 8;
+  let result = "";
+  let hash: number[] = [];
+  const k: number[] = [];
+  let primeCounter = 0;
+
+  const isComposite: Record<number, boolean> = {};
+  for (let candidate = 2; primeCounter < 64; candidate++) {
+    if (!isComposite[candidate]) {
+      for (let i = 0; i < 313; i += candidate) {
+        isComposite[i] = true;
+      }
+      hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
+      k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+    }
   }
-  return randomInt(100000, 1000000).toString();
+
+  for (let i = 0; i < bytes.length; i++) {
+    const wordIdx = i >> 2;
+    const current = words[wordIdx] ?? 0;
+    words[wordIdx] = current | ((bytes[i] ?? 0) << (((3 - i) % 4) * 8));
+  }
+  const endWordIdx = bytes.length >> 2;
+  const currentEnd = words[endWordIdx] ?? 0;
+  words[endWordIdx] = currentEnd | (0x80 << (((3 - bytes.length) % 4) * 8));
+
+  while (((words.length * 4) % 64) !== 56) {
+    words.push(0);
+  }
+  words.push((bitLength / maxWord) | 0);
+  words.push(bitLength & 0xffffffff);
+
+  for (let j = 0; j < words.length; ) {
+    const w = words.slice(j, (j += 16));
+    const oldHash = [...hash];
+    hash = hash.slice(0, 8);
+
+    for (let i = 0; i < 64; i++) {
+      const w15 = w[i - 15] ?? 0;
+      const w2 = w[i - 2] ?? 0;
+      const s0 = ((w15 >>> 7) | (w15 << 25)) ^ ((w15 >>> 18) | (w15 << 14)) ^ (w15 >>> 3);
+      const s1 = ((w2 >>> 17) | (w2 << 15)) ^ ((w2 >>> 19) | (w2 << 13)) ^ (w2 >>> 10);
+      w[i] = i < 16 ? (w[i] ?? 0) : (((w[i - 16] ?? 0) + s0 + (w[i - 7] ?? 0) + s1) | 0);
+
+      const h0 = hash[0] ?? 0;
+      const h1 = hash[1] ?? 0;
+      const h2 = hash[2] ?? 0;
+      const h3 = hash[3] ?? 0;
+      const h4 = hash[4] ?? 0;
+      const h5 = hash[5] ?? 0;
+      const h6 = hash[6] ?? 0;
+      const h7 = hash[7] ?? 0;
+      const ki = k[i] ?? 0;
+      const wi = w[i] ?? 0;
+
+      const s1b = ((h4 >>> 6) | (h4 << 26)) ^ ((h4 >>> 11) | (h4 << 21)) ^ ((h4 >>> 25) | (h4 << 7));
+      const ch = (h4 & h5) ^ (~h4 & h6);
+      const temp1 = (h7 + s1b + ch + ki + wi) | 0;
+      const s0b = ((h0 >>> 2) | (h0 << 30)) ^ ((h0 >>> 13) | (h0 << 19)) ^ ((h0 >>> 22) | (h0 << 10));
+      const maj = (h0 & h1) ^ (h0 & h2) ^ (h1 & h2);
+      const temp2 = (s0b + maj) | 0;
+
+      hash = [(temp1 + temp2) | 0, h0, h1, h2, (h3 + temp1) | 0, h4, h5, h6];
+    }
+
+    for (let i = 0; i < 8; i++) {
+      hash[i] = ((hash[i] ?? 0) + (oldHash[i] ?? 0)) | 0;
+    }
+  }
+
+  for (let i = 0; i < 8; i++) {
+    for (let j = 3; j >= 0; j--) {
+      const b = ((hash[i] ?? 0) >> (8 * j)) & 255;
+      result += (b < 16 ? "0" : "") + b.toString(16);
+    }
+  }
+  return result;
+}
+
+/**
+ * Constant-time string equality check to prevent timing attacks.
+ */
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
 }
 
 /**
@@ -200,7 +292,7 @@ export function hashVerificationPin(pin: string, salt: string): string {
   const normalizedSalt = salt.trim();
   const data = `${normalizedSalt}:${normalizedPin}`;
 
-  return createHash("sha256").update(Buffer.from(data, "utf-8")).digest("hex");
+  return sha256Hex(data);
 }
 
 /**
@@ -210,11 +302,7 @@ export function verifyPin(pin: string, salt: string, expectedHash: string): bool
   if (!pin || !salt || !expectedHash) return false;
   const computed = hashVerificationPin(pin, salt);
 
-  const a = Buffer.from(computed, "utf-8");
-  const b = Buffer.from(expectedHash, "utf-8");
-
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  return constantTimeEqual(computed, expectedHash);
 }
 
 // =========================================================================
@@ -413,7 +501,7 @@ export function computePayloadChecksum(payload: Record<string, unknown>): string
   const sortedKeys = Object.keys(payload).sort();
   const canonicalString = sortedKeys.map((k) => `${k}:${String(payload[k] ?? "")}`).join("|");
 
-  return createHash("sha256").update(Buffer.from(canonicalString, "utf-8")).digest("hex");
+  return sha256Hex(canonicalString);
 }
 
 // =========================================================================
@@ -526,3 +614,46 @@ export const getSeniorWhatsAppSummaryInput = z.object({
   seniorId: z.string().uuid("Invalid senior ID"),
 });
 export type GetSeniorWhatsAppSummaryInput = z.infer<typeof getSeniorWhatsAppSummaryInput>;
+
+// =========================================================================
+// 8. Shared UI Types (isomorphic for Client & Server)
+// =========================================================================
+
+export interface ConversationSummary {
+  id: string;
+  orgId: string;
+  phoneNumber: string;
+  maskedPhoneNumber: string;
+  status: string;
+  lastMessageAt: string | null;
+  lastMessagePreview: string | null;
+  unreadCount: number;
+  identity: {
+    id: string;
+    displayName: string | null;
+    relationshipType: string;
+    status: string;
+    consentStatus: string;
+    verifiedAt: string | null;
+  } | null;
+  senior: {
+    id: string;
+    displayName: string;
+    recordCode: string;
+  } | null;
+}
+
+export interface MessageItem {
+  id: string;
+  conversationId: string;
+  providerMessageSid: string;
+  direction: "inbound" | "outbound";
+  fromNumber: string;
+  toNumber: string;
+  messageType: string;
+  bodyText: string | null;
+  mediaMeta?: Record<string, unknown> | undefined;
+  providerStatus: string;
+  processingStatus: string;
+  createdAt: string;
+}

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, type ErrorComponentProps } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { z } from "zod";
@@ -83,7 +83,28 @@ export const Route = createFileRoute("/_authenticated/seniors/$seniorId/")({
     ],
   }),
   component: SeniorDetail,
+  errorComponent: SeniorErrorComponent,
 });
+
+function SeniorErrorComponent({ error, reset }: ErrorComponentProps) {
+  return (
+    <Page title="Senior profile">
+      <Notice tone="critical" title="Couldn't load this profile">
+        {error instanceof Error ? error.message : "An unexpected error occurred while loading this record."}
+      </Notice>
+      <div className="mt-4 flex gap-2">
+        <Button variant="default" onClick={() => reset()}>
+          Try again
+        </Button>
+        <Button asChild variant="outline">
+          <Link to="/seniors">
+            <ArrowLeft aria-hidden="true" /> Back to seniors
+          </Link>
+        </Button>
+      </div>
+    </Page>
+  );
+}
 
 function NotFound() {
   return (

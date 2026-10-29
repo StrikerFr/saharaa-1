@@ -21,7 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ConversationSummary, MessageItem } from "@/lib/whatsapp.server";
+import type { ConversationSummary, MessageItem } from "@/lib/whatsapp";
 import { sendWhatsAppMessage, syncWhatsAppMessages } from "@/lib/whatsapp.functions";
 import { cn } from "@/lib/utils";
 
@@ -206,7 +206,7 @@ export function ConversationView({
 
               {conversation.identity?.relationshipType && (
                 <span className="rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
-                  {conversation.identity.relationshipType.replace("_", " ")}
+                  {(conversation.identity.relationshipType || "").replace("_", " ")}
                 </span>
               )}
             </div>

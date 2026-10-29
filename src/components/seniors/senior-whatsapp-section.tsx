@@ -108,6 +108,30 @@ export function SeniorWhatsAppSection({ seniorId, seniorName }: SeniorWhatsAppSe
     }
   };
 
+  if (summaryQuery.isError) {
+    return (
+      <div className="surface p-5 rounded-xl border border-border flex flex-col gap-3">
+        <div className="flex items-center gap-2 text-warning">
+          <AlertCircle className="size-5" />
+          <h3 className="font-semibold text-foreground">WhatsApp Communications Unavailable</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {summaryQuery.error instanceof Error
+            ? summaryQuery.error.message
+            : "Could not load WhatsApp communications for this senior."}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start gap-1 text-xs"
+          onClick={() => summaryQuery.refetch()}
+        >
+          <RefreshCw className="size-3.5" /> Try again
+        </Button>
+      </div>
+    );
+  }
+
   if (summaryQuery.isLoading) {
     return (
       <div className="space-y-4">
@@ -286,7 +310,7 @@ export function SeniorWhatsAppSection({ seniorId, seniorName }: SeniorWhatsAppSe
                         {id.displayName || "Family Contact"}
                       </span>
                       <span className="rounded bg-secondary px-1.5 py-0.2 text-[10px] text-muted-foreground capitalize">
-                        {id.relationshipType.replace("_", " ")}
+                        {(id.relationshipType || "").replace("_", " ")}
                       </span>
                     </div>
                     <div className="mt-0.5 text-muted-foreground font-mono text-[11px]">
