@@ -202,3 +202,41 @@ export async function summarize(
   }
   throw last ?? new ProviderError("provider_error", "groq");
 }
+
+/**
+ * Direct conversational completion using Groq LLM.
+ */
+export async function generateCompletion(
+  messages: { role: "system" | "user" | "assistant"; content: string }[],
+  cfg: GroqConfig,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ content: string; model: string }> {
+  let last: ProviderError | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetchImpl(`${BASE}/chat/completions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+        body: JSON.stringify({
+          model: cfg.llmModel,
+          temperature: 0.2,
+          max_completion_tokens: 1500,
+          messages,
+        }),
+      });
+      if (!res.ok) throw classifyHttp("groq", res.status, await hint(res));
+      const body = (await res.json()) as {
+        choices?: { message?: { content?: string | null; refusal?: string | null } }[];
+      };
+      const msg = body.choices?.[0]?.message;
+      if (!msg || msg.refusal || typeof msg.content !== "string")
+        throw new ProviderError("invalid_output", "groq");
+      return { content: msg.content, model: cfg.llmModel };
+    } catch (e) {
+      last = classifyThrown("groq", e);
+      if (!(last.retryable || last.code === "invalid_output")) throw last;
+    }
+  }
+  throw last ?? new ProviderError("provider_error", "groq");
+}

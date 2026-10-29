@@ -99,3 +99,5 @@ The test suite in [`src/test/integration-audit.test.ts`](file:///c:/Users/aryan/
 - **Scenario E (Revoked Family Access)**: Immediate access termination upon revocation; denial of cross-senior requests.
 - **Scenario F (Failure Recovery & Idempotency)**: Replay of identical `client_request_id` returns existing record without duplicate side-effects; downstream failure leaves valid observation intact.
 - **Scenario G (Dashboard & Report Consistency)**: Queue counts match between `/overview`, `/alerts`, and `/follow-ups`.
+- **Scenario H (Direct AI Care Q&A for Family & Coordinators)**: Dual authorization (`can_access_senior` OR `can_access_senior_as_family`), query length validation, grounded context assembly (30-day vitals, daily care routines, active alerts), and zero-hallucination guardrails.
+

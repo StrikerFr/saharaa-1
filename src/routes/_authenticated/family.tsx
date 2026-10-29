@@ -24,6 +24,7 @@ import { z } from "zod";
 import { FamilyReportModal } from "@/components/family/family-report-modal";
 import { FamilyRoutineSummary } from "@/components/family/family-routine-summary";
 import { FamilyWellbeingCard } from "@/components/family/family-wellbeing-card";
+import { SeniorAIChat } from "@/components/ai/senior-ai-chat";
 import { Page, Section } from "@/components/shell/page";
 import { EmptyState, Notice, StatusBadge } from "@/components/shell/states";
 import { MetricCard } from "@/components/shell/metric";
@@ -211,6 +212,9 @@ function FamilyDashboardContent({ data, seniorId }: { data: any; seniorId: strin
           icon={CalendarCheck}
         />
       </div>
+
+      {/* Interactive AI Assistant for Family */}
+      <SeniorAIChat seniorId={seniorId} seniorName={senior.displayName} />
 
       {/* Main Tabbed Interface */}
       <Tabs defaultValue="routine" className="w-full">

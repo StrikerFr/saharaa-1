@@ -102,6 +102,7 @@ describe("Scenario A — New blood-pressure observation (160/40 mmHg)", () => {
       value_numeric_2: 40,
       value_text: null,
       unit: "mmHg",
+      note: null,
     });
     expect(formatted).toBe("160/40 mmHg");
   });
@@ -390,5 +391,31 @@ describe("Scenario G — Dashboard, Overview and Reports consistency", () => {
     expect(followUpRequired).toBe(1);
     expect(closed).toBe(1);
     expect(awaitingReview + inReview + followUpRequired + closed).toBe(cases.length);
+  });
+});
+
+describe("Scenario H — Direct AI Care Q&A for Family & Coordinators", () => {
+  it("validates AI Q&A question input schema", async () => {
+    const { askSeniorAIInput } = await import("@/lib/ai-assistant.functions");
+
+    // Valid question
+    const parsed = askSeniorAIInput.parse({
+      seniorId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      question: "How has Arjun's health and blood pressure been over the past month?",
+      history: [
+        { role: "user", content: "Is he doing okay?" },
+        { role: "assistant", content: "Yes, routine vitals are steady." },
+      ],
+    });
+    expect(parsed.question).toBe("How has Arjun's health and blood pressure been over the past month?");
+    expect(parsed.history.length).toBe(2);
+
+    // Rejects empty / blank questions
+    expect(() =>
+      askSeniorAIInput.parse({
+        seniorId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        question: "   ",
+      }),
+    ).toThrow();
   });
 });

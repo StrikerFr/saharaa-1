@@ -172,7 +172,7 @@ describe("Phase 9: Family Portal Domain & Validation", () => {
 
   describe("Date and time formatting in senior time zone", () => {
     it("formats ISO string nicely in Asia/Kolkata", () => {
-      const iso = "2026-10-29T10:30:00Z";
+      const iso = "2026-10-20T10:30:00Z";
       const formatted = formatFamilyDate(iso, "Asia/Kolkata");
       expect(formatted).toContain("Oct");
       expect(formatted).toContain("2026");

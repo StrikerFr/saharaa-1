@@ -24,6 +24,7 @@ import { CareAccessGate } from "@/components/seniors/access-gate";
 import { RecordBaseline } from "@/components/seniors/record-baseline";
 import { RecordObservation } from "@/components/seniors/record-observation";
 import { WellbeingSummary } from "@/components/seniors/wellbeing-summary";
+import { SeniorAIChat } from "@/components/ai/senior-ai-chat";
 import { DailyRoutine } from "@/components/seniors/daily-routine";
 import { ObservationTrends } from "@/components/seniors/observation-trends";
 import { MetricCard } from "@/components/shell/metric";
@@ -234,6 +235,7 @@ function Profile({ s, seniorId }: { s: SeniorRecord; seniorId: string }) {
 
         <TabsContent value="overview" className="flex flex-col gap-8">
           <WellbeingSummary seniorId={seniorId} timeZone={tz} />
+          <SeniorAIChat seniorId={seniorId} seniorName={s.display_name} />
           <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
             <section className="surface p-5" aria-labelledby="profile-h">
               <h2 id="profile-h" className="font-semibold">
