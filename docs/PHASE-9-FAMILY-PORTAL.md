@@ -79,11 +79,21 @@ The migration is defined in [`supabase/phase9_family_portal.sql`](file:///c:/Use
 ## 5. UI Routes & Navigation
 
 1. **`/family`** ([`src/routes/_authenticated/family.tsx`](file:///c:/Users/aryan/Downloads/saharaa-1-main/saharaa-1-main/src/routes/_authenticated/family.tsx)):
-   - Senior switcher for family members linked to multiple seniors (or coordinators previewing the family portal).
-   - Senior vitals & observations timeline (verified only).
-   - "Care Team Follow-ups & Requests" card where family members can directly submit responses.
-   - "Submitted Updates & Voice Notes" tab displaying submission history and review status pills.
-   - Text-to-Speech integration via ElevenLabs to read aloud confirmed summaries.
+   - **Senior Switcher**: Supports caregivers with access to multiple seniors (or coordinators previewing the portal).
+   - **Today & Routine Tab** ([`src/components/family/family-routine-summary.tsx`](file:///c:/Users/aryan/Downloads/saharaa-1-main/saharaa-1-main/src/components/family/family-routine-summary.tsx)):
+     - 4 KPI metric cards: Today's Routine Adherence, Medications taken today, 7-Day Routine Consistency Score, and Weekly completed events.
+     - 7-Day visual progress bars breaking down daily routine adherence.
+     - Today's checklist with category icons, scheduled times, status badges (`Done`, `Overdue`, `Upcoming`, `Missed`), and quick family "Mark Done" action (`source: 'family'`).
+   - **Wellbeing & Updates Tab** ([`src/components/family/family-wellbeing-card.tsx`](file:///c:/Users/aryan/Downloads/saharaa-1-main/saharaa-1-main/src/components/family/family-wellbeing-card.tsx)):
+     - On-demand 14-day AI wellbeing narrative citing verified observations, highlighting today's notes, monitored areas, and recommended checks.
+     - ElevenLabs Text-to-Speech audio read-aloud button for family members.
+     - Care Team Follow-ups & Requests card where family members can submit responses to coordinator inquiries.
+   - **Observations Tab**:
+     - Verified vitals and measurements cards with timestamps, values, and care notes.
+     - Complete observation history table.
+   - **Voice Notes & Reports Tab**:
+     - Audio recorder with live transcription preview and text editing.
+     - Family submission history with coordinator review status pills.
 2. **`/invite?token=...`** ([`src/routes/_authenticated/invite.tsx`](file:///c:/Users/aryan/Downloads/saharaa-1-main/saharaa-1-main/src/routes/_authenticated/invite.tsx)):
    - Single-click invitation verification and acceptance.
    - Auto-redirects to `/family` upon successful authorization.

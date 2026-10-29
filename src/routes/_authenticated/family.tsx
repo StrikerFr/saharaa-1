@@ -22,6 +22,8 @@ import {
 import { z } from "zod";
 
 import { FamilyReportModal } from "@/components/family/family-report-modal";
+import { FamilyRoutineSummary } from "@/components/family/family-routine-summary";
+import { FamilyWellbeingCard } from "@/components/family/family-wellbeing-card";
 import { Page, Section } from "@/components/shell/page";
 import { EmptyState, Notice, StatusBadge } from "@/components/shell/states";
 import { MetricCard } from "@/components/shell/metric";
@@ -211,15 +213,32 @@ function FamilyDashboardContent({ data, seniorId }: { data: any; seniorId: strin
       </div>
 
       {/* Main Tabbed Interface */}
-      <Tabs defaultValue="timeline" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:grid-cols-3">
-          <TabsTrigger value="timeline">Care Updates</TabsTrigger>
+      <Tabs defaultValue="routine" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
+          <TabsTrigger value="routine">Today & Routine</TabsTrigger>
+          <TabsTrigger value="summary">Wellbeing & Updates</TabsTrigger>
           <TabsTrigger value="observations">Observations</TabsTrigger>
           <TabsTrigger value="reports">Voice Notes & Reports ({familyReports.length})</TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Care Updates & Tasks */}
-        <TabsContent value="timeline" className="flex flex-col gap-6 pt-4">
+        {/* Tab 1: Today & Routine (Weekly Summary + Today's Schedule + Routine Score) */}
+        <TabsContent value="routine" className="flex flex-col gap-6 pt-4">
+          <FamilyRoutineSummary
+            seniorId={seniorId}
+            seniorName={senior.displayName}
+            timeZone={senior.timeZone}
+          />
+        </TabsContent>
+
+        {/* Tab 2: Care Updates & 14-Day AI Wellbeing Summary */}
+        <TabsContent value="summary" className="flex flex-col gap-6 pt-4">
+          {/* AI Wellbeing Summary & Read-Aloud */}
+          <FamilyWellbeingCard
+            seniorId={seniorId}
+            seniorName={senior.displayName}
+            timeZone={senior.timeZone}
+          />
+
           {/* Actionable Follow-ups from Care Team */}
           {followUps.length > 0 && (
             <Section
@@ -280,8 +299,10 @@ function FamilyDashboardContent({ data, seniorId }: { data: any; seniorId: strin
               </div>
             </Section>
           )}
+        </TabsContent>
 
-          {/* Recent Approved Observations Timeline */}
+        {/* Tab 3: Detailed Observations & Checked Vitals */}
+        <TabsContent value="observations" className="flex flex-col gap-6 pt-4">
           <Section
             title="Recent Checked Vitals & Observations"
             description="Verified observations recorded by caregivers and coordinators."
@@ -313,11 +334,8 @@ function FamilyDashboardContent({ data, seniorId }: { data: any; seniorId: strin
               </div>
             )}
           </Section>
-        </TabsContent>
 
-        {/* Tab 2: Detailed Observations Table */}
-        <TabsContent value="observations" className="pt-4">
-          <Section title="Observation History" description="All measurements and daily vital signs approved for family view.">
+          <Section title="Observation History Table" description="All measurements and daily vital signs approved for family view.">
             {recentObservations.length === 0 ? (
               <p className="text-sm text-muted-foreground">No entries available.</p>
             ) : (
