@@ -886,6 +886,51 @@ async function seed() {
     }
   }
 
+  // 6. Ensure Evaluator / Judge Account
+  console.log("\n--- Ensuring Hackathon Judge / Evaluator Account ---");
+  const DEMO_EMAIL = "judge@sahaara.care";
+  const DEMO_PASSWORD = "SahaaraJudge2026!";
+  try {
+    const { data: list } = await supabase.auth.admin.listUsers();
+    let judgeUser = list?.users.find((u) => u.email?.toLowerCase() === DEMO_EMAIL.toLowerCase());
+    if (!judgeUser) {
+      const { data: created } = await supabase.auth.admin.createUser({
+        email: DEMO_EMAIL,
+        password: DEMO_PASSWORD,
+        email_confirm: true,
+        user_metadata: { display_name: "Hackathon Evaluation Committee" },
+      });
+      judgeUser = created?.user;
+    } else {
+      await supabase.auth.admin.updateUserById(judgeUser.id, {
+        password: DEMO_PASSWORD,
+        email_confirm: true,
+      });
+    }
+
+    if (judgeUser) {
+      await supabase.from("profiles").upsert({
+        id: judgeUser.id,
+        display_name: "Hackathon Evaluation Committee",
+      });
+
+      for (const role of ["admin", "coordinator", "family"]) {
+        await supabase.from("user_roles").upsert(
+          { user_id: judgeUser.id, role },
+          { onConflict: "user_id, role" }
+        );
+      }
+
+      await supabase.from("organization_members").upsert(
+        { user_id: judgeUser.id, org_id: ORG_ID },
+        { onConflict: "user_id" }
+      );
+      console.log(`✓ Judge account ready: ${DEMO_EMAIL}`);
+    }
+  } catch (err: any) {
+    console.warn("Could not provision judge user in seed:", err?.message);
+  }
+
   console.log("\n=== Seeding Successfully Completed ===");
   console.log("1. 'garvittt' profile removed.");
   console.log("2. 5 Senior profiles have complete data, routine schedules, and 7-day adherence.");

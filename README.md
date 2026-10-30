@@ -6,7 +6,12 @@
 
 *An AI-powered early-warning, health telemetry, and care-coordination platform connecting seniors living at home, family caregivers, and clinical care coordinators.*
 
----
+<br />
+
+[![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-saharaa--1.vercel.app-00C781?style=for-the-badge&logo=vercel&logoColor=white)](https://saharaa-1.vercel.app/)
+[![Sign In](https://img.shields.io/badge/🔐%20Sign%20In%20Portal-Auth%20Route-0A85EA?style=for-the-badge)](https://saharaa-1.vercel.app/auth)
+
+<br /><br />
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](#-verification--testing)
 [![Test Suite](https://img.shields.io/badge/tests-299%20passing-brightgreen?style=flat-square)](#-verification--testing)
@@ -18,6 +23,20 @@
 ---
 
 </div>
+
+> ### 🏆 Live Demo & Evaluation Portal Access (For Hackathon Judges)
+>
+> | Resource / Field | Access Value / Direct Link |
+> | :--- | :--- |
+> | **🌐 Live Production Application** | [**https://saharaa-1.vercel.app/**](https://saharaa-1.vercel.app/) |
+> | **🔐 Direct Sign-In Portal** | [**https://saharaa-1.vercel.app/auth**](https://saharaa-1.vercel.app/auth) |
+> | **📧 Evaluator Email** | `judge@sahaara.care` |
+> | **🔑 Evaluator Password** | `SahaaraJudge2026!` |
+> | **🛡️ Access Permissions** | **Full Access** (`admin`, `coordinator`, `family` across entire demo cohort) |
+>
+> *This account is pre-provisioned with full operational, coordinator, and administrative clearance. Upon login, evaluators have unrestricted access to all senior profiles, the Fire-Boltt Legacy live smartwatch telemetry feed (`/monitoring`), real-time WhatsApp clinical messaging (`/messages`), Ask Sahaara conversational AI, daily routine tracking with Whisper voice dictation, and clinical risk review workflows.*
+
+---
 
 ## 📸 Platform Interface Showcase
 
@@ -55,23 +74,24 @@ Below are authentic screenshots from the active Sahaara production workspace:
 
 ## 📋 Table of Contents
 
-1. [Platform Interface Showcase](#-platform-interface-showcase)
-2. [Project Overview](#-project-overview)
-3. [Implementation & Architecture Status Matrix](#-implementation--architecture-status-matrix)
-4. [Technology Stack — 4-Layer Architecture](#-technology-stack--4-layer-architecture)
+1. [Live Demo & Evaluator Portal Access](#-live-demo--evaluation-portal-access-for-hackathon-judges)
+2. [Platform Interface Showcase](#-platform-interface-showcase)
+3. [Project Overview](#-project-overview)
+4. [Implementation & Architecture Status Matrix](#-implementation--architecture-status-matrix)
+5. [Technology Stack — 4-Layer Architecture](#-technology-stack--4-layer-architecture)
    - [Layer 1: Capture and Communication](#layer-1-capture-and-communication)
    - [Layer 2: Local AI & Inference](#layer-2-local-ai--inference)
    - [Layer 3: Data and Synchronization](#layer-3-data-and-synchronization)
    - [Layer 4: Presentation and Processing](#layer-4-presentation-and-processing)
-5. [Wearable Health Monitoring & Smartwatch Integration (Fire-Boltt Legacy)](#-wearable-health-monitoring--smartwatch-integration)
-6. [AI Models & AI Architecture](#-ai-models--ai-architecture)
-7. [Complete System Architecture Diagrams](#-complete-system-architecture-diagrams)
-8. [Environment Variables Reference](#-environment-variables-reference)
-9. [Setup & Local Development Guide](#-setup--local-development-guide)
-10. [Repository Structure](#-repository-structure)
-11. [Care Safety & Clinical Guardrails](#-care-safety--clinical-guardrails)
-12. [Verification & Testing](#-verification--testing)
-13. [Deploying to Vercel](#-deploying-to-vercel)
+6. [Wearable Health Monitoring & Smartwatch Integration (Fire-Boltt Legacy)](#-wearable-health-monitoring--smartwatch-integration)
+7. [AI Models & AI Architecture](#-ai-models--ai-architecture)
+8. [Complete System Architecture Diagrams](#-complete-system-architecture-diagrams)
+9. [Environment Variables Reference](#-environment-variables-reference)
+10. [Setup & Local Development Guide](#-setup--local-development-guide)
+11. [Repository Structure](#-repository-structure)
+12. [Care Safety & Clinical Guardrails](#-care-safety--clinical-guardrails)
+13. [Verification & Testing](#-verification--testing)
+14. [Deploying to Vercel](#-deploying-to-vercel)
 
 ---
 
@@ -679,12 +699,12 @@ bun run build
 
 ## 🌐 Deploying to Vercel
 
-Sahaara is pre-configured for automated continuous deployment on **Vercel**:
+Sahaara is pre-configured for automated continuous deployment on **Vercel**. The official production deployment is live at [**https://saharaa-1.vercel.app/**](https://saharaa-1.vercel.app/).
 
 1. Push your branch to GitHub and import the repository into **Vercel**.
 2. Vercel automatically honors `vercel.json` and builds via Bun into the `.vercel/output` format.
 3. In **Project Settings → Environment Variables**, configure the server-side credentials listed in the [Environment Variables Reference](#-environment-variables-reference).
-4. Add your Vercel deployment domain to your Supabase project's **Auth → URL Configuration → Redirect URLs** (e.g. `https://your-deployment.vercel.app/**`).
+4. Add your Vercel deployment domain to your Supabase project's **Auth → URL Configuration → Redirect URLs** (e.g. `https://saharaa-1.vercel.app/**`).
 5. Deploy!
 
 ---
