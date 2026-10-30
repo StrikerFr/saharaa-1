@@ -371,37 +371,43 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
     },
   });
 
-  // Intelligent Scroll: Scroll to the TOP of the newly received message so user reads from the beginning
+  // Container-isolated smooth scrolling: strictly scrolls ONLY the chat container,
+  // NEVER the browser window or outer page.
   useEffect(() => {
     if (messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
     const timer = setTimeout(() => {
-      if (isFullscreen) {
-        if (fullScreenLatestMsgRef.current) {
-          fullScreenLatestMsgRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-      } else {
-        if (latestMsgRef.current) {
-          latestMsgRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+      const container = isFullscreen ? fullScreenScrollRef.current : scrollRef.current;
+      const target = isFullscreen ? fullScreenLatestMsgRef.current : latestMsgRef.current;
+      if (!container) return;
+
+      if (lastMsg?.role === "user") {
+        // User sent a message: scroll to bottom of chat container
+        container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+      } else if (target) {
+        // Assistant response arrived: scroll container to the top of this response
+        // without dragging or moving the main webpage viewport.
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const relativeTop = targetRect.top - containerRect.top + container.scrollTop;
+        container.scrollTo({
+          top: Math.max(0, relativeTop - 12),
+          behavior: "smooth",
+        });
       }
-    }, 80);
+    }, 60);
     return () => clearTimeout(timer);
   }, [messages, isFullscreen]);
 
-  // When query is pending, scroll loading indicator to top of view
+  // When query is pending, scroll chat container to show the loading skeleton
   useEffect(() => {
     if (!mutation.isPending) return;
     const timer = setTimeout(() => {
-      if (isFullscreen) {
-        if (fullScreenLoadingRef.current) {
-          fullScreenLoadingRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-      } else {
-        if (loadingRef.current) {
-          loadingRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+      const container = isFullscreen ? fullScreenScrollRef.current : scrollRef.current;
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
       }
-    }, 80);
+    }, 60);
     return () => clearTimeout(timer);
   }, [mutation.isPending, isFullscreen]);
 
@@ -513,7 +519,7 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
             {messages.length > 0 && (
               <div
                 ref={scrollRef}
-                className="flex min-h-[280px] max-h-[550px] flex-col gap-4 overflow-y-auto pr-1 text-sm justify-start"
+                className="relative flex min-h-[280px] max-h-[550px] flex-col gap-4 overflow-y-auto pr-1 text-sm justify-start"
               >
                 {messages.map((m, idx) => {
                   const isLast = idx === messages.length - 1;
@@ -678,7 +684,7 @@ export function SeniorAIChat({ seniorId, seniorName, compact = false }: SeniorAI
           {/* Fullscreen Scrollable Chat Body */}
           <div
             ref={fullScreenScrollRef}
-            className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 py-6 flex flex-col justify-start"
+            className="relative flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 py-6 flex flex-col justify-start"
           >
             <div className="mx-auto w-full max-w-4xl flex flex-col gap-6 justify-start">
               {messages.length === 0 ? (
