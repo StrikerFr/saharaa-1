@@ -19,10 +19,8 @@ const DEV_ID = "d02a492d-585f-4a2d-95be-57b18d072820";
 
 const SENIOR_IDS = {
   arjun: "d93cf59e-228c-5bc1-92b7-6680782a0b03", // S2C23-0004: Arjun Verma
-  grace: "6b602128-8f87-5cc9-a76d-dabc2623d2a3", // S2C23-0005: Kamala Devi
   kamala: "6b602128-8f87-5cc9-a76d-dabc2623d2a3", // S2C23-0005: Kamala Devi
   leela1: "ec348932-ca90-5457-aa49-34355dedd3c7", // S2C23-0001: Leela Sharma
-  leela2: "f04d791b-755d-5b24-8776-a62354e4de37", // S2C23-0002: Ramesh Patel
   ramesh: "f04d791b-755d-5b24-8776-a62354e4de37", // S2C23-0002: Ramesh Patel
   meera: "b618f90d-095e-58d3-8b84-6ac16dafcfe3", // S2C23-0003: Meera Joshi
 };
@@ -164,10 +162,10 @@ async function seed() {
       family_visible: true,
     },
 
-    // Grace 0005
+    // Kamala 0005
     {
-      senior_id: SENIOR_IDS.grace,
-      review_case_id: caseBySenior.get(SENIOR_IDS.grace) || null,
+      senior_id: SENIOR_IDS.kamala,
+      review_case_id: caseBySenior.get(SENIOR_IDS.kamala) || null,
       title: "Evaluate sleep disruption & evening caffeine intake",
       notes: "Review sleep diary. Switch to decaf herbal infusion after 4:00 PM.",
       assigned_to: ARYAN_ID,
@@ -176,8 +174,8 @@ async function seed() {
       family_visible: true,
     },
     {
-      senior_id: SENIOR_IDS.grace,
-      review_case_id: caseBySenior.get(SENIOR_IDS.grace) || null,
+      senior_id: SENIOR_IDS.kamala,
+      review_case_id: caseBySenior.get(SENIOR_IDS.kamala) || null,
       title: "Follow-up phone call with daughter (Dr. Ananya)",
       notes: "Discuss morning walk consistency and verify medication stock for next month.",
       assigned_to: DEV_ID,
@@ -209,8 +207,8 @@ async function seed() {
     }
   }
 
-  // 4. Seed Daily Routine Items & Logs for Synthetic Grace 0005
-  console.log("\n--- Seeding Daily Routine Items & Logs for Synthetic Grace 0005 ---");
+  // 4. Seed Daily Routine Items & Logs for Kamala Devi 0005
+  console.log("\n--- Seeding Daily Routine Items & Logs for Kamala Devi 0005 ---");
   const graceItems = [
     {
       category: "medication",
@@ -324,7 +322,7 @@ async function seed() {
       }
     }
   }
-  console.log("✓ Populated 7-day routine logs for Grace (showing high adherence).");
+  console.log("✓ Populated 7-day routine logs for Kamala Devi (showing high adherence).");
 
   // 5. Seed Care Reports with AI Extraction Cues across Seniors
   console.log("\n--- Seeding Rich Care Reports & AI Cues ---");
@@ -457,9 +455,9 @@ async function seed() {
       ],
     },
 
-    // 4. Grace 0005: Typed Report from Daughter (Dr. Ananya)
+    // 4. Kamala Devi 0005: Typed Report from Daughter (Dr. Ananya)
     {
-      senior_id: SENIOR_IDS.grace,
+      senior_id: SENIOR_IDS.kamala,
       source_type: "typed_text" as const,
       reporter_relation: "family" as const,
       status: "pending_review" as const,
@@ -712,7 +710,7 @@ async function seed() {
       ],
     },
     {
-      senior_id: SENIOR_IDS.grace,
+      senior_id: SENIOR_IDS.kamala,
       phoneNumber: "+919988776655",
       displayName: "Dr. Ananya (Daughter)",
       relationshipType: "caregiver",

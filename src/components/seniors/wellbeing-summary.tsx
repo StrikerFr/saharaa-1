@@ -15,7 +15,15 @@ import type { QualityStatus, ReviewPriority } from "@/risk/engine";
  * (the only risk indication in Sahaara). Right: an on-demand AI narrative of
  * the last 14 days — unverified, not saved, never a score.
  */
-export function WellbeingSummary({ seniorId, timeZone }: { seniorId: string; timeZone: string }) {
+export function WellbeingSummary({
+  seniorId,
+  timeZone,
+  leftSlot,
+}: {
+  seniorId: string;
+  timeZone: string;
+  leftSlot?: React.ReactNode;
+}) {
   const assessment = useQuery({
     queryKey: ["risk_assessments", seniorId, "latest-summary"],
     queryFn: async () => {
@@ -43,49 +51,54 @@ export function WellbeingSummary({ seniorId, timeZone }: { seniorId: string; tim
   return (
     <section
       aria-labelledby="status-h"
-      className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+      className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start"
     >
       <h2 id="status-h" className="sr-only">
         Current status
       </h2>
 
-      <div className="surface flex flex-col gap-3 p-5">
-        <div className="flex items-center gap-2">
-          <ScanSearch className="size-4 text-primary" aria-hidden="true" />
-          <h3 className="font-semibold">Review level</h3>
-          <span className="ml-auto text-xs text-muted-foreground">From the rules engine</span>
-        </div>
-        {assessment.isPending ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : assessment.isError ? (
-          <Notice tone="critical" title="Couldn't load the latest assessment." />
-        ) : !a || !p ? (
-          <p className="text-sm text-muted-foreground">
-            No assessment has been run yet. Run one from the "Review & follow-ups" tab.
-          </p>
-        ) : (
-          <>
-            <div>
-              <StatusBadge tone={p.tone}>{p.label}</StatusBadge>
-            </div>
-            <p className="text-sm text-muted-foreground">{p.help}</p>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-              <dt className="text-muted-foreground">Data</dt>
-              <dd>{QUALITY_LABEL[a.data_quality]}</dd>
-              <dt className="text-muted-foreground">Changes in</dt>
-              <dd>
-                {a.changed_domains.length
-                  ? a.changed_domains.map((d) => DOMAIN_LABEL[d] ?? d).join(", ")
-                  : "None found in evaluated rules"}
-              </dd>
-              <dt className="text-muted-foreground">Assessed</dt>
-              <dd>{formatInZone(a.created_at, timeZone)}</dd>
-            </dl>
-            <p className="text-xs text-muted-foreground">
-              Sahaara shows review levels, not risk scores or diagnoses.
+      {/* Left Column: Review level + Profile & Care context */}
+      <div className="flex flex-col gap-4">
+        <div className="surface flex flex-col gap-3 p-5">
+          <div className="flex items-center gap-2">
+            <ScanSearch className="size-4 text-primary" aria-hidden="true" />
+            <h3 className="font-semibold">Review level</h3>
+            <span className="ml-auto text-xs text-muted-foreground">From the rules engine</span>
+          </div>
+          {assessment.isPending ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : assessment.isError ? (
+            <Notice tone="critical" title="Couldn't load the latest assessment." />
+          ) : !a || !p ? (
+            <p className="text-sm text-muted-foreground">
+              No assessment has been run yet. Run one from the "Review & follow-ups" tab.
             </p>
-          </>
-        )}
+          ) : (
+            <>
+              <div>
+                <StatusBadge tone={p.tone}>{p.label}</StatusBadge>
+              </div>
+              <p className="text-sm text-muted-foreground">{p.help}</p>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                <dt className="text-muted-foreground">Data</dt>
+                <dd>{QUALITY_LABEL[a.data_quality]}</dd>
+                <dt className="text-muted-foreground">Changes in</dt>
+                <dd>
+                  {a.changed_domains.length
+                    ? a.changed_domains.map((d) => DOMAIN_LABEL[d] ?? d).join(", ")
+                    : "None found in evaluated rules"}
+                </dd>
+                <dt className="text-muted-foreground">Assessed</dt>
+                <dd>{formatInZone(a.created_at, timeZone)}</dd>
+              </dl>
+              <p className="text-xs text-muted-foreground">
+                Sahaara shows review levels, not risk scores or diagnoses.
+              </p>
+            </>
+          )}
+        </div>
+
+        {leftSlot}
       </div>
 
       <div className="surface flex flex-col gap-3 border-dashed p-5">

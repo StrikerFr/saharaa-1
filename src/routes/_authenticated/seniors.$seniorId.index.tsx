@@ -277,38 +277,43 @@ function Profile({ s, seniorId }: { s: SeniorRecord; seniorId: string }) {
         </TabsList>
 
         <TabsContent value="overview" className="flex flex-col gap-8">
-          <WellbeingSummary seniorId={seniorId} timeZone={tz} />
+          <WellbeingSummary
+            seniorId={seniorId}
+            timeZone={tz}
+            leftSlot={
+              <>
+                <section className="surface p-5" aria-labelledby="profile-h">
+                  <h2 id="profile-h" className="font-semibold">
+                    Profile
+                  </h2>
+                  <dl className="mt-3 grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-2 text-sm">
+                    <dt className="text-muted-foreground">Age</dt>
+                    <dd>{age != null ? `${age} years` : <Missing />}</dd>
+                    <dt className="text-muted-foreground">Date of birth</dt>
+                    <dd className="text-data font-normal">{s.date_of_birth ?? <Missing />}</dd>
+                    <dt className="text-muted-foreground">Language</dt>
+                    <dd>{LANGUAGES[s.preferred_language]}</dd>
+                    <dt className="text-muted-foreground">Time zone</dt>
+                    <dd>{tz}</dd>
+                  </dl>
+                </section>
+                <section className="surface flex flex-col gap-3 p-5" aria-labelledby="context-h">
+                  <h2 id="context-h" className="font-semibold">
+                    Care context
+                  </h2>
+                  <div className="text-sm">
+                    <h3 className="font-semibold text-muted-foreground">Communication</h3>
+                    <p className="mt-0.5 whitespace-pre-line">{s.communication_notes ?? <Missing />}</p>
+                  </div>
+                  <div className="text-sm">
+                    <h3 className="font-semibold text-muted-foreground">Context</h3>
+                    <p className="mt-0.5 whitespace-pre-line">{s.care_context ?? <Missing />}</p>
+                  </div>
+                </section>
+              </>
+            }
+          />
           <SeniorAIChat seniorId={seniorId} seniorName={s.display_name} />
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-            <section className="surface p-5" aria-labelledby="profile-h">
-              <h2 id="profile-h" className="font-semibold">
-                Profile
-              </h2>
-              <dl className="mt-3 grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-2 text-sm">
-                <dt className="text-muted-foreground">Age</dt>
-                <dd>{age != null ? `${age} years` : <Missing />}</dd>
-                <dt className="text-muted-foreground">Date of birth</dt>
-                <dd className="text-data font-normal">{s.date_of_birth ?? <Missing />}</dd>
-                <dt className="text-muted-foreground">Language</dt>
-                <dd>{LANGUAGES[s.preferred_language]}</dd>
-                <dt className="text-muted-foreground">Time zone</dt>
-                <dd>{tz}</dd>
-              </dl>
-            </section>
-            <section className="surface flex flex-col gap-3 p-5" aria-labelledby="context-h">
-              <h2 id="context-h" className="font-semibold">
-                Care context
-              </h2>
-              <div className="text-sm">
-                <h3 className="font-semibold text-muted-foreground">Communication</h3>
-                <p className="mt-0.5 whitespace-pre-line">{s.communication_notes ?? <Missing />}</p>
-              </div>
-              <div className="text-sm">
-                <h3 className="font-semibold text-muted-foreground">Context</h3>
-                <p className="mt-0.5 whitespace-pre-line">{s.care_context ?? <Missing />}</p>
-              </div>
-            </section>
-          </div>
           <Latest seniorId={seniorId} timeZone={tz} onMore={() => setTab("observations")} />
           <Baselines seniorId={seniorId} timeZone={tz} />
           <p className="text-xs text-muted-foreground">
