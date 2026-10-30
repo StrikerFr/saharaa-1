@@ -35,7 +35,7 @@ interface AlertDef {
 const ALERTS_TO_SEED: AlertDef[] = [
   {
     seniorId: "f04d791b-755d-5b24-8776-a62354e4de37", // Synthetic Leela 0002
-    seniorName: "Synthetic Leela 0002",
+    seniorName: "Ramesh Patel",
     priority: "prompt_review_recommended",
     changedDomains: ["medication"],
     alertReason: "Critical: Multiple missed doses of Metformin & irregular fasting glucose",
@@ -56,7 +56,7 @@ const ALERTS_TO_SEED: AlertDef[] = [
   },
   {
     seniorId: "d93cf59e-228c-5bc1-92b7-6680782a0b03", // Synthetic Arjun 0004
-    seniorName: "Synthetic Arjun 0004",
+    seniorName: "Arjun Verma",
     priority: "prompt_review_recommended",
     changedDomains: ["blood_pressure", "medication"],
     alertReason: "High Priority: Elevated blood pressure (158/96 mmHg) & missed Metoprolol beta-blocker",
@@ -79,7 +79,7 @@ const ALERTS_TO_SEED: AlertDef[] = [
   },
   {
     seniorId: "b618f90d-095e-58d3-8b84-6ac16dafcfe3", // Synthetic Meera 0003
-    seniorName: "Synthetic Meera 0003",
+    seniorName: "Meera Joshi",
     priority: "review_recommended",
     changedDomains: ["mobility"],
     alertReason: "Mobility decline: Increased knee pain, requiring full physical assistance to stand",
@@ -99,7 +99,7 @@ const ALERTS_TO_SEED: AlertDef[] = [
   },
   {
     seniorId: "ec348932-ca90-5457-aa49-34355dedd3c7", // Synthetic Leela 0001
-    seniorName: "Synthetic Leela 0001",
+    seniorName: "Leela Sharma",
     priority: "review_suggested",
     changedDomains: ["hydration"],
     alertReason: "Hydration check: Fluid intake reduced below target over consecutive days",

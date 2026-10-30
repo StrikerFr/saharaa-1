@@ -18,15 +18,26 @@ const ARYAN_ID = "b6a65591-e29c-4f63-acf4-b3ccdc977fdb";
 const DEV_ID = "d02a492d-585f-4a2d-95be-57b18d072820";
 
 const SENIOR_IDS = {
-  arjun: "d93cf59e-228c-5bc1-92b7-6680782a0b03", // S2C23-0004
-  grace: "6b602128-8f87-5cc9-a76d-dabc2623d2a3", // S2C23-0005
-  leela1: "ec348932-ca90-5457-aa49-34355dedd3c7", // S2C23-0001
-  leela2: "f04d791b-755d-5b24-8776-a62354e4de37", // S2C23-0002
-  meera: "b618f90d-095e-58d3-8b84-6ac16dafcfe3", // S2C23-0003
+  arjun: "d93cf59e-228c-5bc1-92b7-6680782a0b03", // S2C23-0004: Arjun Verma
+  grace: "6b602128-8f87-5cc9-a76d-dabc2623d2a3", // S2C23-0005: Kamala Devi
+  kamala: "6b602128-8f87-5cc9-a76d-dabc2623d2a3", // S2C23-0005: Kamala Devi
+  leela1: "ec348932-ca90-5457-aa49-34355dedd3c7", // S2C23-0001: Leela Sharma
+  leela2: "f04d791b-755d-5b24-8776-a62354e4de37", // S2C23-0002: Ramesh Patel
+  ramesh: "f04d791b-755d-5b24-8776-a62354e4de37", // S2C23-0002: Ramesh Patel
+  meera: "b618f90d-095e-58d3-8b84-6ac16dafcfe3", // S2C23-0003: Meera Joshi
 };
 
 async function seed() {
   console.log("=== Sahaara Demo Data Enhancement ===");
+
+  // 0. Ensure authentic Indian names without 'Synthetic' prefix in the database
+  console.log("Setting senior display names to authentic Indian names...");
+  await supabase.from("seniors").update({ display_name: "Kamala Devi" }).eq("id", SENIOR_IDS.kamala);
+  await supabase.from("seniors").update({ display_name: "Arjun Verma" }).eq("id", SENIOR_IDS.arjun);
+  await supabase.from("seniors").update({ display_name: "Meera Joshi" }).eq("id", SENIOR_IDS.meera);
+  await supabase.from("seniors").update({ display_name: "Ramesh Patel" }).eq("id", SENIOR_IDS.ramesh);
+  await supabase.from("seniors").update({ display_name: "Leela Sharma" }).eq("id", SENIOR_IDS.leela1);
+  console.log("✓ Seniors updated to: Kamala Devi, Arjun Verma, Meera Joshi, Ramesh Patel, Leela Sharma");
 
   // 1. Double check garvittt is deleted
   const { data: garvit } = await supabase.from("seniors").select("id").ilike("display_name", "%garvit%");

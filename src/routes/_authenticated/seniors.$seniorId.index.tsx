@@ -221,7 +221,11 @@ function Profile({ s, seniorId }: { s: SeniorRecord; seniorId: string }) {
           <StatusBadge tone={s.care_status === "active" ? "success" : "neutral"}>
             {CARE_STATUS[s.care_status]}
           </StatusBadge>
-          {s.is_synthetic && <StatusBadge tone="warning">Synthetic test record</StatusBadge>}
+          {s.is_synthetic && (
+            <span className="rounded-full bg-secondary/80 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground border border-border/60">
+              Synthetic
+            </span>
+          )}
           <span>{age != null ? `${age} years` : "Age not recorded"}</span>
           <span aria-hidden="true">·</span>
           <span className="inline-flex items-center gap-1">

@@ -79,13 +79,12 @@ function MonitoringDashboardContent() {
   // Set default senior once loaded
   useEffect(() => {
     if (seniors && seniors.length > 0 && !selectedSeniorId) {
-      // Prefer Garvit if available, otherwise first senior
-      const garvit = seniors.find((s) => s.display_name.toLowerCase().includes("garvit"));
-      const first = seniors[0];
-      if (garvit) {
-        setSelectedSeniorId(garvit.id);
-      } else if (first) {
-        setSelectedSeniorId(first.id);
+      // Prefer Kamala or Arjun if available, otherwise first senior
+      const preferred = seniors.find((s) => s.display_name.toLowerCase().includes("kamala")) ||
+                        seniors.find((s) => s.display_name.toLowerCase().includes("arjun")) ||
+                        seniors[0];
+      if (preferred) {
+        setSelectedSeniorId(preferred.id);
       }
     }
   }, [seniors, selectedSeniorId]);

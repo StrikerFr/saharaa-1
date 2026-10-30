@@ -36,7 +36,7 @@ interface SeniorPlan {
 const SENIOR_PLANS: SeniorPlan[] = [
   {
     id: "ec348932-ca90-5457-aa49-34355dedd3c7",
-    name: "Synthetic Leela 0001",
+    name: "Leela Sharma",
     code: "S2C23-0001",
     items: [
       {
@@ -143,7 +143,7 @@ const SENIOR_PLANS: SeniorPlan[] = [
   },
   {
     id: "f04d791b-755d-5b24-8776-a62354e4de37",
-    name: "Synthetic Leela 0002",
+    name: "Ramesh Patel",
     code: "S2C23-0002",
     items: [
       {
@@ -240,7 +240,7 @@ const SENIOR_PLANS: SeniorPlan[] = [
   },
   {
     id: "b618f90d-095e-58d3-8b84-6ac16dafcfe3",
-    name: "Synthetic Meera 0003",
+    name: "Meera Joshi",
     code: "S2C23-0003",
     items: [
       {
@@ -347,7 +347,7 @@ const SENIOR_PLANS: SeniorPlan[] = [
   },
   {
     id: "d93cf59e-228c-5bc1-92b7-6680782a0b03",
-    name: "Synthetic Arjun 0004",
+    name: "Arjun Verma",
     code: "S2C23-0004",
     items: [
       {
