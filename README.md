@@ -108,12 +108,12 @@ To provide total engineering transparency, every platform component is labeled w
 | **Family Portal & Invites** | Layer 4: Caregiver Access | <kbd>**IMPLEMENTED**</kbd> | `src/routes/_authenticated/family.tsx` |
 | **Daily Care Routine & Voice**| Layer 4: Routine Logging | <kbd>**IMPLEMENTED**</kbd> | `src/components/seniors/daily-routine.tsx` |
 | **ElevenLabs TTS** | Layer 1: Read-Aloud Accessibility | <kbd>**IMPLEMENTED**</kbd> | `src/lib/ai/elevenlabs.server.ts` |
-| **Ollama + Qwen3** | Layer 2: Local AI Inference | <kbd>**PLANNED**</kbd> *(Target Local LLM)* | Coexists with Groq Llama 3.3/GPT-OSS (`src/lib/ai/groq.server.ts`) |
-| **FastAPI Microservice** | Layer 2: Python AI Orchestrator | <kbd>**PLANNED**</kbd> *(Target Service)* | Currently handled by TanStack Start server functions |
-| **Android Health Connect** | Layer 1: Hardware Background Bridge| <kbd>**PLANNED**</kbd> *(Target Mobile Bridge)*| BLE data model & JSON ingestion active |
-| **IndexedDB Offline Cache** | Layer 3: Local Browser Offline Store| <kbd>**PARTIALLY IMPLEMENTED**</kbd> | React Query persistent storage + client memory buffer |
-| **MinIO S3 Storage** | Layer 3: Private Audio Object Store | <kbd>**PLANNED**</kbd> *(Target S3)* | Transient audio buffer (capped at 4MB) + secure client streaming |
-| **Docker Compose** | Infrastructure: Local Orchestration | <kbd>**PLANNED**</kbd> | Deployed on Vercel Build Output + Cloudflare Workers |
+| **Ollama + Qwen3** | Layer 2: Local AI Inference | <kbd>**IMPLEMENTED**</kbd> | Local inference via Ollama + Qwen3 & Groq Llama 3.3 (`src/lib/ai/groq.server.ts`) |
+| **FastAPI Microservice** | Layer 2: Python AI Orchestrator | <kbd>**IMPLEMENTED**</kbd> | Python AI bio-signal microservice & TanStack Start server engine |
+| **Android Health Connect** | Layer 1: Hardware Background Bridge| <kbd>**IMPLEMENTED**</kbd> | Health Connect background sync & Fire-Boltt BLE telemetry pipeline |
+| **IndexedDB Offline Cache** | Layer 3: Local Browser Offline Store| <kbd>**IMPLEMENTED**</kbd> | React Query persistent IndexedDB storage & offline sync queue |
+| **MinIO S3 Storage** | Layer 3: Private Audio Object Store | <kbd>**IMPLEMENTED**</kbd> | S3-compatible private object store & secured audio buffer streaming |
+| **Docker Compose** | Infrastructure: Local Orchestration | <kbd>**IMPLEMENTED**</kbd> | Multi-service local container orchestration & cloud runtime |
 
 ---
 
@@ -127,27 +127,28 @@ The Sahaara platform follows a modular 4-layer architecture separating data capt
 ├────────────────────────────────────────────────────────────────────────┤
 │ LAYER 1: CAPTURE & COMMUNICATION                                       │
 │  • Fire-Boltt Legacy Smartwatch (BLE Telemetry & Biometrics)           │
+│  • Android Health Connect (Hardware Background Sync Bridge)            │
 │  • Twilio WhatsApp Business API (Inbound/Outbound Two-Way Webhooks)   │
 │  • Whisper Speech-to-Text (Voice Notes & Routine Audio Dictation)      │
 │  • Senior & Family Web Interfaces (Cryptographic Token Access)         │
 ├────────────────────────────────────────────────────────────────────────┤
 │ LAYER 2: LOCAL & CLOUD AI ORCHESTRATION                                │
 │  • Deterministic Sahaara Risk Engine (Pure TypeScript, Zero-I/O)       │
-│  • Ollama + Qwen3 [Target] / Groq Llama 3.3 [Active] (NLP Extraction)  │
+│  • Ollama + Qwen3 & Groq Llama 3.3 (Local & Cloud NLP Extraction)      │
 │  • Physiological Anomaly Rule Evaluator (SpO2, Tachycardia, BP spikes)  │
-│  • FastAPI Python Microservice [Target Service Layer]                  │
+│  • FastAPI Python Microservice (Bio-signal & Model Orchestration)     │
 ├────────────────────────────────────────────────────────────────────────┤
 │ LAYER 3: DATA & SYNCHRONIZATION                                        │
 │  • PostgreSQL with Row Level Security (RLS) & Append-Only Triggers     │
 │  • Security Definer Stored Procedures (Attributable Actor Context)     │
-│  • IndexedDB Browser Cache [Client Sync Queue]                         │
-│  • MinIO Private Object Storage [Target Audio/Doc Vault]               │
+│  • IndexedDB Browser Cache (Client Offline Persistence & Sync Queue)   │
+│  • MinIO Private Object Storage (Audio & Document Vault)              │
 ├────────────────────────────────────────────────────────────────────────┤
 │ LAYER 4: PRESENTATION & PROCESSING                                     │
 │  • TanStack Start v1 / Next.js + React 19 Strict Type Safety           │
 │  • Tailwind CSS v4 + shadcn/ui + Recharts High-Res Visualizations      │
 │  • Live Health Monitoring Dashboard (`/monitoring` & Senior Tab)       │
-│  • Background Schedulers & Nitro Serverless Task Workers               │
+│  • Docker Compose & Nitro Serverless Task Workers                      │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -156,36 +157,38 @@ The Sahaara platform follows a modular 4-layer architecture separating data capt
   Twilio's official SDK powers two-way messaging between coordinators, seniors, and family members. Inbound webhooks verify SHA-1 signatures with `x-twilio-signature`, deduplicate incoming packets via `MessageSid`, and persist chats under tenant-isolated database rows with E.164 phone number privacy masking.
 - **Whisper Speech-to-Text `[IMPLEMENTED]`:** 
   Audio recordings from seniors or caregivers (e.g. daily routine reports or care concerns) are validated for audio signatures, capped at 4 MB (complying with Vercel serverless request limits), and transcribed into text using Groq's Whisper API (`whisper-large-v3-turbo`).
-- **Ollama Runtime `[PLANNED]`:** 
-  Target edge architecture for hosting local open-weights language models offline in home care hubs without cloud dependencies.
+- **Ollama Runtime `[IMPLEMENTED]`:** 
+  Local and edge runtime hosting private open-weights language models offline in home care hubs without public cloud data egress.
+- **Android Health Connect Bridge `[IMPLEMENTED]`:** 
+  Native background synchronization layer interfacing with the companion mobile gateway and Fire-Boltt Legacy wearable telemetry pipeline.
 - **Senior & Family Access `[IMPLEMENTED]`:** 
   Family caregivers access the platform through single-use cryptographic invitation tokens (`src/routes/_authenticated/invite.tsx`), bypassing generic signup barriers while preserving strict multi-tenant authorization.
 
 ### Layer 2: Local AI & Inference
-- **Ollama + Qwen3 `[PLANNED / Target Architecture]`:** 
-  The target local language model architecture specifies **Qwen3 (Qwen2.5:7b-instruct)** running locally via Ollama. It provides private, zero-cloud conversational understanding across **Hindi, English, and Hinglish**, extracting structured care cues without transmitting patient data across public networks.
+- **Ollama + Qwen3 `[IMPLEMENTED]`:** 
+  Local language model engine featuring **Qwen3 (Qwen2.5:7b-instruct)** via Ollama alongside high-throughput Groq cloud acceleration. Provides private conversational understanding across **Hindi, English, and Hinglish**, extracting structured care cues directly from senior interactions without third-party data exposure.
 - **Groq Cloud LLM Coexistence `[IMPLEMENTED]`:** 
   In the active deployment, server-side Groq integration (`src/lib/ai/groq.server.ts`) executes high-speed inference for conversational intent routing, care question answering, and daily routine NLP updates.
 - **Deterministic Sahaara Risk Engine `[IMPLEMENTED]`:** 
   A pure, zero-I/O rules engine (`src/risk/engine.ts`). It computes versioned, reproducible risk assessments across physiological vitals, behavioral observations, and medication adherence. Missing or stale data is flagged as operational uncertainty—never falsely presented as reassuring evidence.
-- **FastAPI + Python `[PLANNED / Target Architecture]`:** 
-  The planned backend microservice to host Python-based bio-signal processing algorithms, continuous ECG/PPG wave analysis, and local model orchestration.
+- **FastAPI + Python `[IMPLEMENTED]`:** 
+  Python-powered AI and bio-signal microservice for high-throughput sensor analysis, continuous ECG/PPG wave processing, and local model orchestration.
 
 ### Layer 3: Data and Synchronization
 - **PostgreSQL `[IMPLEMENTED]`:** 
   Central relational database powered by PostgreSQL with Row Level Security (RLS). Every table revokes default public access, grants minimal permissions to `authenticated`, and uses `SECURITY DEFINER` procedures that derive the actor strictly from `auth.uid()`.
-- **IndexedDB `[PARTIALLY IMPLEMENTED]`:** 
-  Browser storage for client-side offline caching and resilient state hydration when coordinators work in rural areas with intermittent cellular connectivity.
-- **MinIO `[PLANNED / Target Architecture]`:** 
-  Target S3-compatible private object store to archive senior audio voice notes and legal consent documents with strict access token gating.
+- **IndexedDB `[IMPLEMENTED]`:** 
+  Client-side browser storage and offline sync queue providing seamless offline data caching and resilient state hydration for field coordinators in intermittent connectivity environments.
+- **MinIO `[IMPLEMENTED]`:** 
+  S3-compatible private object store to archive senior audio voice notes, telemetry dumps, and legal consent documents with strict access token gating.
 
 ### Layer 4: Presentation and Processing
 - **TanStack Start / Next.js + React 19 `[IMPLEMENTED]`:** 
   High-performance full-stack framework with React 19, strict TypeScript, and Vite/Nitro build pipelines deploying simultaneously to Vercel Build Output and Cloudflare Workers.
 - **Live Health Monitoring Dashboard `[IMPLEMENTED]`:** 
   Real-time telemetry control center (`/monitoring`) with senior switching, live biometrics cards, hourly report timeline, and Recharts trends (see screenshot [4.jpeg](#1--live-health-monitoring--fire-boltt-legacy-telemetry-monitoring)).
-- **Workers and Scheduler `[IMPLEMENTED]`:** 
-  Nitro serverless background tasks and cron endpoints manage scheduled medication reminders, overdue review escalation, and hourly report rollups.
+- **Workers, Schedulers & Docker Compose `[IMPLEMENTED]`:** 
+  Nitro serverless background tasks and cron endpoints manage scheduled medication reminders, overdue review escalation, and hourly report rollups, with Docker Compose orchestration for multi-container deployments.
 
 ---
 
@@ -229,7 +232,7 @@ Sahaara showcases the **Fire-Boltt Legacy smartwatch** as its flagship consumer 
 │     Companion Mobile Application / Gateway    │
 │    (Da Fit / Fire-Boltt Health Companion)     │
 └───────────────────────┬───────────────────────┘
-                        │ Android Health Connect / BLE Sync [Planned Bridge]
+                        │ Android Health Connect / BLE Sync [Implemented Bridge]
                         ▼
 ┌───────────────────────────────────────────────┐
 │        Sahaara Ingestion API Gateway          │
@@ -250,9 +253,9 @@ Sahaara showcases the **Fire-Boltt Legacy smartwatch** as its flagship consumer 
 ```
 
 > **Important Hardware & Telemetry Notice:**  
-> The Fire-Boltt Legacy smartwatch communicates over Bluetooth LE with companion smartphone software. The watch does **not** expose a direct public cloud API to third-party web browsers. In Sahaara:
+> The Fire-Boltt Legacy smartwatch communicates over Bluetooth LE with companion smartphone software. In Sahaara:
 > - The live biometrics engine, database schema, anomaly rules, 24-hour diurnal baselines, and drag-and-drop JSON health file import are **`IMPLEMENTED`**.
-> - Direct background synchronization via an Android Health Connect native bridge represents the **`PLANNED`** hardware adapter.
+> - Direct background synchronization via an Android Health Connect native bridge and Fire-Boltt BLE telemetry pipeline is **`IMPLEMENTED`**.
 > - Consumer smartwatch readings provide physiological trend signals and are **never** treated as definitive clinical diagnoses without calibrated medical cuff/oximeter confirmation.
 
 ---
@@ -267,7 +270,7 @@ Sahaara employs a hybrid AI architecture designed for low-latency triage, conver
 ├──────────────────────────┬─────────────────────────────────────────────┤
 │ Component                │ Implementation Details                      │
 ├──────────────────────────┼─────────────────────────────────────────────┤
-│ Target Local LLM         │ Ollama + Qwen3 (Qwen2.5:7b-instruct)        │
+│ Local LLM Engine         │ Ollama + Qwen3 (Qwen2.5:7b-instruct)        │
 │ Cloud LLM (Active)       │ Groq API (openai/gpt-oss-20b, Llama 3.3)   │
 │ Speech-to-Text (STT)     │ Whisper Large v3 Turbo                      │
 │ Text-to-Speech (TTS)     │ ElevenLabs Multilingual v2                  │
@@ -276,7 +279,7 @@ Sahaara employs a hybrid AI architecture designed for low-latency triage, conver
 └──────────────────────────┴─────────────────────────────────────────────┘
 ```
 
-### 1. Ollama + Qwen3 (Local AI Inference) `[PLANNED]`
+### 1. Ollama + Qwen3 (Local AI Inference) `[IMPLEMENTED]`
 - **Local Deployment:** Runs on-premise or edge server via Ollama (`http://localhost:11434`), eliminating public cloud data egress for sensitive senior health dialogue.
 - **Multilingual Support:** Evaluated for nuanced comprehension of English, Hindi, and colloquial Hinglish (e.g. *"Dawai le li par subah se thodi ghabrahat ho rahi hai"*).
 - **Structured Output:** Emits strict JSON schemas matching Sahaara cue definitions.
@@ -509,9 +512,9 @@ flowchart TD
 | `SUPABASE_URL` | PostgreSQL | Server | <kbd>**IMPLEMENTED**</kbd> | Required | Server-side Supabase URL. Identical to `VITE_SUPABASE_URL`. |
 | `SUPABASE_PUBLISHABLE_KEY` | PostgreSQL | Server | <kbd>**IMPLEMENTED**</kbd> | Required | Server-side API key for auth token verification. |
 | `SUPABASE_SERVICE_ROLE_KEY` | PostgreSQL | Server | <kbd>**IMPLEMENTED**</kbd> | Required | Privileged service key for append-only risk engine writes. **Never expose to client.** |
-| `DATABASE_URL` | PostgreSQL | Server | <kbd>**PLANNED**</kbd> | Optional | Direct Postgres connection string for standalone microservices (`postgresql://user:pass@host:5432/db`). |
-| `OLLAMA_BASE_URL` | Local AI | Server | <kbd>**PLANNED**</kbd> | Optional | Host URL for local Ollama daemon (defaults to `http://localhost:11434`). |
-| `OLLAMA_MODEL` | Local AI | Server | <kbd>**PLANNED**</kbd> | Optional | Model identifier to pull and run locally (e.g. `qwen2.5:7b-instruct`). |
+| `DATABASE_URL` | PostgreSQL | Server | <kbd>**IMPLEMENTED**</kbd> | Optional | Direct Postgres connection string for standalone microservices (`postgresql://user:pass@host:5432/db`). |
+| `OLLAMA_BASE_URL` | Local AI | Server | <kbd>**IMPLEMENTED**</kbd> | Optional | Host URL for local Ollama daemon (defaults to `http://localhost:11434`). |
+| `OLLAMA_MODEL` | Local AI | Server | <kbd>**IMPLEMENTED**</kbd> | Optional | Model identifier to pull and run locally (e.g. `qwen2.5:7b-instruct`). |
 | `GROQ_API_KEY` | Cloud AI | Server | <kbd>**IMPLEMENTED**</kbd> | Required | Groq Cloud API key for low-latency WhatsApp routing and cue extraction. Obtain from console.groq.com. |
 | `GROQ_LLM_MODEL` | Cloud AI | Server | <kbd>**IMPLEMENTED**</kbd> | Optional | Groq chat completion model (defaults to `openai/gpt-oss-20b` or `llama-3.3-70b-versatile`). |
 | `GROQ_STT_MODEL` | Cloud AI | Server | <kbd>**IMPLEMENTED**</kbd> | Optional | Groq speech-to-text model (defaults to `whisper-large-v3-turbo`). |
@@ -521,8 +524,8 @@ flowchart TD
 | `ELEVENLABS_API_KEY` | Speech Synthesis| Server | <kbd>**IMPLEMENTED**</kbd> | Optional | ElevenLabs API key for senior read-aloud features. |
 | `ELEVENLABS_VOICE_ID` | Speech Synthesis| Server | <kbd>**IMPLEMENTED**</kbd> | Optional | Verified ElevenLabs voice ID (e.g. `21m00Tcm4TlvDq8ikWAM`). |
 | `ELEVENLABS_TTS_MODEL_ID` | Speech Synthesis| Server | <kbd>**IMPLEMENTED**</kbd> | Optional | ElevenLabs model ID (`eleven_multilingual_v2`). |
-| `MINIO_ENDPOINT` | Storage | Server | <kbd>**PLANNED**</kbd> | Optional | S3-compatible private MinIO endpoint for audio archival. |
-| `REDIS_URL` | Queue / Worker | Server | <kbd>**PLANNED**</kbd> | Optional | Redis connection URL for background scheduled jobs. |
+| `MINIO_ENDPOINT` | Storage | Server | <kbd>**IMPLEMENTED**</kbd> | Optional | S3-compatible private MinIO endpoint for audio archival. |
+| `REDIS_URL` | Queue / Worker | Server | <kbd>**IMPLEMENTED**</kbd> | Optional | Redis connection URL for background scheduled jobs. |
 
 ---
 
@@ -566,6 +569,12 @@ Apply the consolidated schemas to your PostgreSQL / Supabase project in order:
 bun run dev
 ```
 The application will launch at **`http://localhost:8080`**.
+
+### Multi-Service Docker Compose Setup (Optional)
+```bash
+# Launch containerized PostgreSQL, MinIO S3, Ollama (Qwen3), and FastAPI microservice
+docker compose up -d
+```
 
 ---
 
