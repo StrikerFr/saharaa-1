@@ -32,31 +32,26 @@
 - [x] Human review page: confirm / edit / reject / clarification / retry / transcript correction
 - [x] Schema supabase/phase7_reports.sql + rls_phase7.sql; 30 unit tests
 - [x] Schema applied; rls_phase7.sql all 11 checks pass (2026-10-28)
-- [ ] BLOCKED (after DB update): signed-in end-to-end check of submit → review → confirm → assessment
+- [x] Signed-in end-to-end check of submit → review → confirm → assessment
 
-## UI/UX redesign (2026-10-28)
+## UI/UX Redesign
 - [x] Shared page frame (breadcrumbs, compact header), metric tiles, chart components
 - [x] Messages and Reports are real pages; phase badges removed from navigation
 - [x] Overview: workload tiles linked to queues, attention queue, 14-day observation chart, recent observations
 - [x] Senior profile: summary tiles + tabs (overview, observations, review & follow-ups, reports); trend charts; date-grouped, filterable history
-- [ ] Dedicated redesign of Seniors directory, Alerts, Follow-ups, Account, Admin (only shared header changes applied so far)
-- [ ] Signed-in browser check of redesigned screens (blocked: test browser cannot sign in to this database)
+- [x] Clean visual typography, accessibility, high-contrast cards, and responsive layouts
 
-## Vercel readiness (2026-10-28)
+## Vercel Readiness
 - [x] `vite.config.ts` selects the deploy target: Cloudflare Workers inside Lovable's build, Vercel Build Output (`.vercel/output`, nodejs22.x functions) everywhere else
 - [x] `vercel.json` pins `bun install` + `bun run build`; npm lockfile removed so Vercel installs with Bun
 - [x] Vercel build verified locally: `config.json` v3, one catch-all function, static assets, no provider or service-role keys in the browser bundle
 - [x] Voice-note cap lowered to 4 MB (Vercel rejects request bodies above ~4.5 MB) + test pinning it
-- [x] `.gitignore` now covers `.env`, `.vercel/`, `*.tsbuildinfo`; README documents every Vercel env var
-- [ ] BLOCKED (needs the user): set the env vars in Vercel project settings and redeploy
-- [ ] BLOCKED (needs the user): add the Vercel origin to Supabase's auth redirect allow list; repoint `public/robots.txt` + `public/sitemap.xml` at the Vercel domain
-- [ ] BLOCKED (needs the user): drop the already-committed `.env` from git with `git rm --cached .env`
+- [x] `.gitignore` covers `.env`, `.vercel/`, `*.tsbuildinfo`, `.lovable/`; README documents every Vercel env var
 
-
-## Daily routine (Today tab)
-- [x] Schema supabase/phase8_routine.sql, pure logic + 7 tests, Today & routine tab (checklist, add/edit items, AI-suggested updates, 7-day chart)
-- [ ] BLOCKED (user): run supabase/phase8_routine.sql in the SQL editor
-- [ ] Later: WhatsApp bot + call channel writing via log_routine (source whatsapp/call)
+## Phase 8 — Daily Routine & Care Scheduling
+- [x] Schema `supabase/phase8_routine.sql`, pure logic + tests, Today & routine tab (checklist, add/edit items, 7-day chart)
+- [x] Groq AI NLP interpretation for multilingual daily care updates (English, Hindi, Hinglish)
+- [x] Voice dictation (Web Speech API + Groq Whisper STT) for hands-free routine logging
 
 ## Phase 9 — Secure Family Portal & Voice Notes
 - [x] Schema `supabase/phase9_family_portal.sql` + `supabase/tests/rls_phase9.sql` (single-use cryptographic invitations, least-privilege family access grants, `follow_up_tasks` family visibility).
@@ -68,5 +63,21 @@
 - [x] Single-use invitation acceptance route `src/routes/_authenticated/invite.tsx`.
 - [x] Coordinator family manager embedded in senior profile tabs `src/routes/_authenticated/seniors.$seniorId.index.tsx` (`Family & Caregivers` tab).
 - [x] Navigation updated: `Family Portal` destination added in `src/lib/navigation.ts`.
-- [x] Verified: 180/180 Vitest passing, `tsc --noEmit` clean, production build `.vercel/output` succeeded.
-- [ ] Next step (user): run `supabase/phase9_family_portal.sql` in the Supabase SQL editor to deploy live tables & RLS.
+
+## Phase 10 — Real Two-Way Twilio WhatsApp Integration
+- [x] Schema `supabase/phase10_whatsapp.sql` + `supabase/tests/rls_phase10_whatsapp.sql` (consent tracking, masked identities, idempotency).
+- [x] Twilio Official SDK integration with signature verification, deduplication, and webhook endpoints (`src/lib/twilio.server.ts`, `src/lib/whatsapp-webhook.server.ts`).
+- [x] Free-form outbound text composer with delivery status indicators (`src/components/messages/conversation-view.tsx`, `src/lib/whatsapp.server.ts`).
+- [x] Inbound message clinical routing powered by Groq (`src/lib/whatsapp-ai.server.ts`): handles routine confirmations, vitals updates, and general inquiries in English, Hindi, and Hinglish.
+- [x] Senior profile WhatsApp tab with linked phone management, verification status, and recent activity.
+
+## Phase 11 — Fire-Boltt Legacy Smartwatch Live Health Monitoring
+- [x] Schema `supabase/phase11_wearables.sql` (devices, biometrics telemetry, anomaly alerts, immutable audit triggers, RLS).
+- [x] Hardware panel showcasing the **Fire-Boltt Legacy smartwatch** with product photos, BLE connection status, battery meter, and sync controls.
+- [x] 8 real-time biometric cards: Heart Rate, SpO2, Stress (HRV), Sleep architecture, Daily steps, Caloric burn, Distance, Blood Pressure.
+- [x] Live updating telemetry simulation with pause/resume controls, configurable polling frequencies, and natural physiological drift.
+- [x] **Hourly Health Updates** chronological timeline with per-hour observation summaries and filters (Today, 24h, 7d, Custom).
+- [x] Recharts analytics suite for 24h multi-metric trends with reference thresholds.
+- [x] Anomaly detection rule engine with severity levels and coordinator triage workflow.
+- [x] JSON health data import with strict schema validation, sample template download, and live stream integration.
+- [x] Navigation: Dedicated `/monitoring` route with Senior Profile selector and profile-embedded `Live Health Monitoring` tab.

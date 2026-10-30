@@ -539,3 +539,4 @@ function renderMiniSparkline(data: number[], colorClass: string) {
     </svg>
   );
 }
+

@@ -5,8 +5,9 @@ Disallow: /alerts
 Disallow: /follow-ups
 Disallow: /messages
 Disallow: /reports
+Disallow: /monitoring
 Disallow: /account
 Disallow: /admin
 Disallow: /reset-password
 
-Sitemap: https://little-sprout-starter.lovable.app/sitemap.xml
+Sitemap: https://saharaa-1.vercel.app/sitemap.xml

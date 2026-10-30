@@ -38,9 +38,9 @@ export const Route = createFileRoute("/")({
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { property: "og:url", content: "https://little-sprout-starter.lovable.app/" },
+      { property: "og:url", content: "https://saharaa-1.vercel.app/" },
     ],
-    links: [{ rel: "canonical", href: "https://little-sprout-starter.lovable.app/" }],
+    links: [{ rel: "canonical", href: "https://saharaa-1.vercel.app/" }],
   }),
   component: Overview,
 });

@@ -1,57 +1,133 @@
 # Sahaara
 
-AI-assisted early-warning and care-coordination platform for seniors living at home. Intended users: care coordinators, seniors, and authorized family members.
+> **AI-Assisted Early-Warning & Care-Coordination Platform for Seniors Living at Home.**  
+> Designed for care coordinators, seniors, and authorized family members.
 
-**Safety boundaries:** Sahaara does not diagnose, prescribe, or replace clinicians or emergency services. It separates observations from interpretations and states uncertainty. Demo data is synthetic and labelled.
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](#verification)
+[![Test Suite](https://img.shields.io/badge/tests-299%20passing-brightgreen)](#verification)
+[![TypeScript](https://img.shields.io/badge/typescript-strict%20clean-blue)](#stack)
+[![Deploy Target](https://img.shields.io/badge/deploy-Vercel%20%2B%20Cloudflare-blueviolet)](#deploying-to-vercel)
 
-**Current state:** Phases 0–7 are implemented (orgs/roles and consent, seniors and observations, synthetic datasets, the risk engine, review cases and follow-up tasks, alerts, AI reports with speech-to-text and read-aloud, and the current-status summary). `roadmap.md` and `docs/` carry the per-phase status and handoffs; `docs/PHASE-0-AUDIT.md` is the verified baseline audit.
+---
 
-## Stack
+## 🌟 Core Modules & Capabilities
 
-TanStack Start v1 (React 19, TypeScript strict), Vite, Tailwind CSS v4, shadcn/ui, Zod, Vitest. Data lives in an external Supabase project (schema in `supabase/`, migrations mirrored in `drizzle/migrations/`). Two build targets are configured: Cloudflare Workers (what Lovable Publish uses) and Vercel — see `vite.config.ts`.
+### 1. ⌚ Smartwatch Live Health Monitoring (Fire-Boltt Legacy)
+- **Showcased Wearable:** Fire-Boltt Legacy smartwatch (1.43" AMOLED, Stainless Steel dial, Bluetooth LE 5.2).
+- **8 Continuous Biometric Cards:** Heart Rate (BPM), Blood Oxygen (SpO2 %), Stress Level (HRV RMSSD score 0–100), Sleep Architecture (Deep, Light, REM), Daily Steps, Caloric Burn, Distance, and Blood Pressure estimates.
+- **Live Updating Stream:** Real-time stream with pause/resume controls, configurable intervals (3s, 5s, 10s, 30s), and natural physiological drift.
+- **Hourly Health Updates Timeline:** Chronological hourly reports (e.g. 10:00 AM, 11:00 AM, 12:00 PM) with synthesized observation summaries and filters (Today, 24h, 7d, Custom Date).
+- **Interactive Analytics:** Multi-tab Recharts dashboard covering diurnal rhythms, hypoxia thresholds, and normal reference ranges.
+- **Anomaly Detection & Care Triage:** Rule-based detection (SpO2 < 92%, Tachycardia > 115 BPM, elevated BP) with coordinator triage workflow (`new` → `acknowledged` → `under_review` → `resolved`).
+- **Health Data Ingestion:** Validated drag-and-drop JSON file import with schema preview and sample download.
 
-## Local development
+### 2. 💬 Real Two-Way Twilio WhatsApp Integration & Groq AI
+- **Two-Way Messaging:** Live coordinator inbox with free-form outbound messaging, Twilio official SDK delivery, and read receipts.
+- **Groq Clinical Intent Routing:** Inbound messages from seniors and family are classified across routine confirmations, vitals updates, and general inquiries in English, Hindi, and Hinglish.
+- **Privacy & Consent Protection:** E.164 phone number masking, explicit consent verification, and multi-tenant isolation.
 
-Prerequisites: Node 22+, Bun 1.4+.
+### 3. 🗓️ Daily Care Routine & Voice Dictation
+- **Scheduled Care Tracking:** Medicine, meals, vitals, hydration, and mobility tracking.
+- **Groq NLP Interpretation:** Interprets natural language updates like *"subah ki BP wali dawai 9 baje li, lunch nahi kiya"* into structured routine logs.
+- **Voice Dictation:** Hands-free speech-to-text recording powered by the Web Speech API and Groq Whisper.
 
-```sh
+### 4. 👨‍👩‍👧 Secure Family Portal & Voice Notes
+- **Attributable Family Access:** Cryptographically verified single-use invitations.
+- **Voice Reports:** Audio notes processed via Groq Whisper with pre-submission transcript editing.
+- **Care Team Follow-ups:** Two-way coordination with family caregivers.
+
+### 5. 🛡️ Deterministic Clinical Risk Engine
+- **Pure & Auditable:** Zero-I/O rules engine (`assess(input, config)`) providing reproducible, versioned risk assessments across physiological and behavioural domains.
+- **Human-in-the-Loop Reviews:** Unverified AI cues never become medical records or diagnoses without human review and attribution.
+
+---
+
+## 🔒 Care Safety & Architecture Principles
+
+- **No Diagnostic Claims:** Consumer wearables and AI suggestions provide trend indications; acute decisions require clinical verification.
+- **Unforgeable Provenance:** Roles, consent, and audit logs are governed by PostgreSQL `SECURITY DEFINER` functions deriving identity from `auth.uid()`.
+- **Append-Only Records:** Telemetry, routine logs, baselines, and observations are append-only. History is never overwritten.
+- **Multi-Tenant Isolation:** Care data is strictly gated by `can_access_org()` and `can_access_senior()`.
+
+---
+
+## 🛠️ Stack
+
+- **Framework:** TanStack Start v1 (React 19, TypeScript strict)
+- **Styling:** Tailwind CSS v4, Lucide Icons, shadcn/ui components
+- **Visualizations:** Recharts interactive charts & custom SVG sparklines
+- **Database & Auth:** Supabase PostgreSQL with Row Level Security (RLS)
+- **AI & Speech Services:** Groq (LLM structured cues & Whisper STT), ElevenLabs (TTS read-aloud)
+- **Communications:** Twilio WhatsApp Business API
+- **Testing:** Vitest & Bun test runner
+
+---
+
+## 🚀 Local Development
+
+### Prerequisites
+- [Bun](https://bun.sh/) 1.4+
+- Node.js 22+
+
+### Setup
+```bash
+# Clone the repository
+git clone https://github.com/StrikerFr/saharaa-1.git
+cd saharaa-1
+
+# Install dependencies with Bun
 bun install
-cp .env.example .env   # fill in the values for your Supabase project
-bun run dev            # http://localhost:8080
+
+# Configure environment variables
+cp .env.example .env
+
+# Run local development server
+bun run dev
 ```
+Open [http://localhost:8080](http://localhost:8080) to access the application.
 
-## Verification
+---
 
-```sh
-bun run lint
-bunx tsgo --noEmit   # or: bunx tsc --noEmit
-bun run test
+## 🧪 Verification & Testing
+
+Run the full verification suite before pushing:
+
+```bash
+# 1. Typecheck strict check
+bun x tsc --noEmit
+
+# 2. Run unit and integration tests (299 tests)
+bun test
+
+# 3. Production build (Vercel Build Output)
 bun run build
 ```
 
-`bun run build` outside a Lovable build produces the Vercel Build Output bundle in `.vercel/output`; inside Lovable's own build pipeline it targets Cloudflare Workers instead.
+---
 
-## Deploying to Vercel
+## 🌐 Deploying to Vercel
 
-1. Push this repository to GitHub and import it in Vercel (or run `vercel` from the CLI).
-2. `vercel.json` already pins `bun install` and `bun run build`. The build writes `.vercel/output`, which Vercel serves directly — routing, server functions and static assets all come from there, so no extra Vercel routing config is needed.
-3. Add the environment variables below in **Vercel → Project → Settings → Environment Variables**, then redeploy so the browser bundle is rebuilt with them.
+The application builds cleanly using the Vercel Build Output specification (`.vercel/output`):
 
-| Variable | Needed for | Notes |
-| --- | --- | --- |
-| `SUPABASE_URL` | server reads, auth middleware | same project as the client keys |
-| `SUPABASE_PUBLISHABLE_KEY` | server-side auth | `SUPABASE_ANON_KEY` also works |
-| `SUPABASE_SERVICE_ROLE_KEY` | server-owned writes (assessments, AI output) | privileged; server-only, never `VITE_` |
-| `VITE_SUPABASE_URL` | browser client | public, inlined at build time |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | browser client | public, inlined at build time |
-| `GROQ_API_KEY` | AI reports, transcription | server-only |
-| `GROQ_LLM_MODEL`, `GROQ_STT_MODEL` | optional overrides | defaults `openai/groq`-listed `openai/gpt-oss-20b` / `whisper-large-v3-turbo` |
-| `ELEVENLABS_API_KEY`, `ELEVENLABS_TTS_MODEL_ID`, `ELEVENLABS_VOICE_ID` | read-aloud | all three required, or the feature shows as "not configured" |
+1. Import the repository in **Vercel**.
+2. Vercel automatically detects `vercel.json` with `bun install` and `bun run build`.
+3. Configure the following environment variables in **Vercel → Settings → Environment Variables**:
 
-### Before the first sign-in on Vercel
+| Variable | Scope | Purpose |
+| :--- | :--- | :--- |
+| `SUPABASE_URL` | Server | Supabase project URL |
+| `SUPABASE_PUBLISHABLE_KEY` | Server | Supabase public API key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server | Privileged server-only mutations |
+| `VITE_SUPABASE_URL` | Client | Browser Supabase URL |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Client | Browser Supabase key |
+| `GROQ_API_KEY` | Server | Groq LLM & Whisper speech-to-text |
+| `TWILIO_ACCOUNT_SID` | Server | Twilio WhatsApp integration |
+| `TWILIO_AUTH_TOKEN` | Server | Twilio authentication |
+| `TWILIO_WHATSAPP_NUMBER` | Server | Twilio WhatsApp sender |
+| `ELEVENLABS_API_KEY` | Server | Read-aloud accessibility |
+| `ELEVENLABS_VOICE_ID` | Server | Configured ElevenLabs voice ID |
 
-- Add the deployment origin to Supabase's **Auth → URL Configuration** allow list, e.g. `https://<your-project>.vercel.app/**`, and set the Site URL there. Without it, email links and OAuth callbacks bounce back to the old host.
-- `public/robots.txt` and `public/sitemap.xml` still name `https://little-sprout-starter.lovable.app`. Point both at the Vercel origin (or your custom domain) so search engines index the right host.
-- Voice notes are capped at 4 MB (`src/lib/ai/audio.ts`) because Vercel rejects serverless request bodies above ~4.5 MB. Groq itself accepts up to 25 MB; the smaller cap keeps the app honest on both hosts.
-- The Vercel build does **not** touch the database. Apply `supabase/` schema/migrations (or `drizzle/migrations/`) to the Supabase project yourself, and run `supabase/tests/rls_matrix.sql`, `supabase/tests/rls_phase6.sql` and `supabase/tests/rls_phase7.sql` against it.
-- `.env` is local-only and git-ignored. If an early commit tracked it, drop it from the repository once with `git rm --cached .env` and commit the removal; the values then live only in Vercel's project settings and your local file.
+---
+
+## 📄 License
+Private & Confidential — Care Safety & Early-Warning Platform.

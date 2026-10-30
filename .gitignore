@@ -45,3 +45,6 @@ env
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# Tooling state
+.lovable/

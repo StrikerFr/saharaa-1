@@ -29,9 +29,9 @@ export const Route = createFileRoute("/auth")({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
-      { property: "og:url", content: "https://little-sprout-starter.lovable.app/auth" },
+      { property: "og:url", content: "https://saharaa-1.vercel.app/auth" },
     ],
-    links: [{ rel: "canonical", href: "https://little-sprout-starter.lovable.app/auth" }],
+    links: [{ rel: "canonical", href: "https://saharaa-1.vercel.app/auth" }],
   }),
   component: AuthPage,
 });

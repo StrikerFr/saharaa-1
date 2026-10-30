@@ -23,9 +23,9 @@ export const Route = createFileRoute("/design-system")({
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { property: "og:url", content: "https://little-sprout-starter.lovable.app/design-system" },
+      { property: "og:url", content: "https://saharaa-1.vercel.app/design-system" },
     ],
-    links: [{ rel: "canonical", href: "https://little-sprout-starter.lovable.app/design-system" }],
+    links: [{ rel: "canonical", href: "https://saharaa-1.vercel.app/design-system" }],
   }),
   component: DesignSystem,
 });
