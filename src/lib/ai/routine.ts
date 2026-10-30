@@ -45,7 +45,7 @@ export const ROUTINE_AI_JSON_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["title", "category", "time"],
+        required: ["title", "category", "time", "details"],
         properties: {
           title: { type: "string" },
           category: {
@@ -140,4 +140,62 @@ export function parseRoutineAi(
       new_items: r.data.new_items || [],
     },
   };
+}
+
+/**
+ * Deterministic fallback parser if LLM provider is unavailable or fails.
+ */
+export function fallbackRuleBasedRoutine(
+  text: string,
+  items: Array<{ id: string; title: string; category: string; scheduled_time?: string }>,
+): RoutineAiResult {
+  const lower = text.toLowerCase();
+  const updates: RoutineProposal[] = [];
+  const unmatched: string[] = [];
+  const new_items: NewRoutineProposal[] = [];
+
+  const isMissed = /miss|skip|nahi li|nahi khaya|not taken/i.test(lower);
+  const status: "done" | "missed" | "skipped" = isMissed
+    ? (/skip/i.test(lower) ? "skipped" : "missed")
+    : "done";
+
+  // Check for time in text (e.g., "7 am", "07:00", "7:30 pm", "9 baje")
+  let timeStr: string | null = null;
+  const timeMatch = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (timeMatch) {
+    const hh = timeMatch[1]!.padStart(2, "0");
+    const mm = timeMatch[2]!;
+    timeStr = `${hh}:${mm}`;
+  } else {
+    const ampmMatch = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+    if (ampmMatch) {
+      let hh = parseInt(ampmMatch[1]!, 10);
+      const mm = ampmMatch[2] || "00";
+      const isPm = ampmMatch[3]!.toLowerCase() === "pm";
+      if (isPm && hh < 12) hh += 12;
+      if (!isPm && hh === 12) hh = 0;
+      timeStr = `${String(hh).padStart(2, "0")}:${mm}`;
+    }
+  }
+
+  // Match items
+  for (const item of items) {
+    const tLower = item.title.toLowerCase();
+    const isMed = /med|medicine|dawai|goli|pill|tablet|amlo|meto/i.test(lower) && item.category === "medication";
+    const isMeal = /meal|breakfast|lunch|dinner|khana|nashta/i.test(lower) && item.category === "meal";
+    const isWalk = /walk|exercise|tehlna|ghoomna/i.test(lower) && item.category === "exercise";
+    const titleMatch = tLower.split(" ").some((w) => w.length > 3 && lower.includes(w));
+
+    if (isMed || isMeal || isWalk || titleMatch) {
+      updates.push({
+        item_id: item.id,
+        status,
+        time: timeStr,
+        note: text.slice(0, 100),
+      });
+      break;
+    }
+  }
+
+  return { updates, unmatched, new_items };
 }

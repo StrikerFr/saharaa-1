@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseRoutineAi } from "@/lib/ai/routine";
+import { fallbackRuleBasedRoutine, parseRoutineAi } from "@/lib/ai/routine";
 import {
   adherenceSeries,
   buildDay,
@@ -104,5 +104,15 @@ describe("daily routine", () => {
       expect(r.value.new_items?.[0]?.category).toBe("exercise");
       expect(r.value.new_items?.[0]?.time).toBe("18:00");
     }
+  });
+
+  it("fallbackRuleBasedRoutine extracts routine update for 'medicine taken at 7 am'", () => {
+    const fallback = fallbackRuleBasedRoutine("medicine taken at 7 am", [
+      { id: "med-1", title: "Morning Blood Pressure Medicine", category: "medication" },
+    ]);
+    expect(fallback.updates).toHaveLength(1);
+    expect(fallback.updates[0]?.item_id).toBe("med-1");
+    expect(fallback.updates[0]?.status).toBe("done");
+    expect(fallback.updates[0]?.time).toBe("07:00");
   });
 });

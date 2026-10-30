@@ -8,6 +8,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { userMessage, ProviderError } from "@/lib/ai/provider-errors";
 import {
   buildRoutinePrompt,
+  fallbackRuleBasedRoutine,
   parseRoutineAi,
   ROUTINE_AI_JSON_SCHEMA,
   ROUTINE_AI_SYSTEM_PROMPT,
@@ -188,6 +189,10 @@ export const interpretRoutineUpdate = createServerFn({ method: "POST" })
       if (!parsed.ok) return { ok: false, message: "The AI reply couldn't be understood. Try rephrasing." };
       return { ok: true, ...parsed.value };
     } catch (e) {
+      const fallback = fallbackRuleBasedRoutine(data.text, items);
+      if (fallback.updates.length > 0 || fallback.new_items.length > 0) {
+        return { ok: true, ...fallback };
+      }
       const pe = e instanceof ProviderError ? e : new ProviderError("provider_error", "groq");
       return { ok: false, message: userMessage(pe) };
     }
