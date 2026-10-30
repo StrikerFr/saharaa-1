@@ -13,7 +13,9 @@ import {
   Languages,
   LineChart as LineChartIcon,
   Pencil,
+  Watch,
 } from "lucide-react";
+import { WearableHealthDashboard } from "@/components/wearables/wearable-health-dashboard";
 
 import { CaseDetail } from "@/components/review/case-detail";
 import { OpenCaseButton } from "@/components/review/review-actions";
@@ -61,6 +63,7 @@ import {
 const TABS = [
   "overview",
   "today",
+  "wearable",
   "observations",
   "alerts",
   "reports",
@@ -249,6 +252,9 @@ function Profile({ s, seniorId }: { s: SeniorRecord; seniorId: string }) {
           <TabsTrigger value="today" className="min-h-10 px-4">
             Today & routine
           </TabsTrigger>
+          <TabsTrigger value="wearable" className="min-h-10 px-4 flex items-center gap-1.5">
+            <Watch className="size-4 text-primary" /> Live Health Monitoring
+          </TabsTrigger>
           <TabsTrigger value="observations" className="min-h-10 px-4">
             Observations
           </TabsTrigger>
@@ -309,6 +315,10 @@ function Profile({ s, seniorId }: { s: SeniorRecord; seniorId: string }) {
 
         <TabsContent value="today" className="flex flex-col gap-8">
           <DailyRoutine seniorId={seniorId} timeZone={tz} />
+        </TabsContent>
+
+        <TabsContent value="wearable" className="flex flex-col gap-8">
+          <WearableHealthDashboard seniorId={seniorId} seniorName={s.display_name} timeZone={tz} />
         </TabsContent>
 
         <TabsContent value="observations" className="flex flex-col gap-8">

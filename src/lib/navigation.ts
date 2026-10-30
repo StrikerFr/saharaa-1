@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Activity,
   BellRing,
   CalendarCheck,
   FileBarChart,
@@ -29,6 +30,7 @@ export type NavItem =
         | "/account"
         | "/admin"
         | "/seniors"
+        | "/monitoring"
         | "/follow-ups"
         | "/alerts"
         | "/messages"
@@ -41,6 +43,7 @@ export type NavItem =
 export const primaryNav: NavItem[] = [
   { label: "Overview", icon: LayoutDashboard, status: "available", to: "/" },
   { label: "Seniors", icon: Users, status: "available", to: "/seniors" },
+  { label: "Live Monitoring", icon: Activity, status: "available", to: "/monitoring" },
   { label: "Alerts", icon: BellRing, status: "available", to: "/alerts" },
   { label: "Follow-ups", icon: CalendarCheck, status: "available", to: "/follow-ups" },
   { label: "Messages", icon: MessagesSquare, status: "available", to: "/messages" },

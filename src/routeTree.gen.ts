@@ -21,6 +21,7 @@ import { Route as AuthenticatedFamilyRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedFollowUpsRouteImport } from './routes/_authenticated/follow-ups'
 import { Route as AuthenticatedInviteRouteImport } from './routes/_authenticated/invite'
 import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
+import { Route as AuthenticatedMonitoringRouteImport } from './routes/_authenticated/monitoring'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedSeniorsIndexRouteImport } from './routes/_authenticated/seniors.index'
 import { Route as AuthenticatedSeniorsNewRouteImport } from './routes/_authenticated/seniors.new'
@@ -87,6 +88,11 @@ const AuthenticatedMessagesRoute = AuthenticatedMessagesRouteImport.update({
   path: '/messages',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMonitoringRoute = AuthenticatedMonitoringRouteImport.update({
+  id: '/monitoring',
+  path: '/monitoring',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -134,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/follow-ups': typeof AuthenticatedFollowUpsRoute
   '/invite': typeof AuthenticatedInviteRoute
   '/messages': typeof AuthenticatedMessagesRoute
+  '/monitoring': typeof AuthenticatedMonitoringRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/seniors/new': typeof AuthenticatedSeniorsNewRoute
   '/seniors/': typeof AuthenticatedSeniorsIndexRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/follow-ups': typeof AuthenticatedFollowUpsRoute
   '/invite': typeof AuthenticatedInviteRoute
   '/messages': typeof AuthenticatedMessagesRoute
+  '/monitoring': typeof AuthenticatedMonitoringRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/seniors/new': typeof AuthenticatedSeniorsNewRoute
   '/seniors': typeof AuthenticatedSeniorsIndexRoute
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/_authenticated/follow-ups': typeof AuthenticatedFollowUpsRoute
   '/_authenticated/invite': typeof AuthenticatedInviteRoute
   '/_authenticated/messages': typeof AuthenticatedMessagesRoute
+  '/_authenticated/monitoring': typeof AuthenticatedMonitoringRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/seniors/new': typeof AuthenticatedSeniorsNewRoute
   '/_authenticated/seniors/': typeof AuthenticatedSeniorsIndexRoute
@@ -195,6 +204,7 @@ export interface FileRouteTypes {
     | '/follow-ups'
     | '/invite'
     | '/messages'
+    | '/monitoring'
     | '/reports'
     | '/seniors/new'
     | '/seniors/'
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
     | '/follow-ups'
     | '/invite'
     | '/messages'
+    | '/monitoring'
     | '/reports'
     | '/seniors/new'
     | '/seniors'
@@ -234,6 +245,7 @@ export interface FileRouteTypes {
     | '/_authenticated/follow-ups'
     | '/_authenticated/invite'
     | '/_authenticated/messages'
+    | '/_authenticated/monitoring'
     | '/_authenticated/reports'
     | '/_authenticated/seniors/new'
     | '/_authenticated/seniors/'
@@ -336,6 +348,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMessagesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/monitoring': {
+      id: '/_authenticated/monitoring'
+      path: '/monitoring'
+      fullPath: '/monitoring'
+      preLoaderRoute: typeof AuthenticatedMonitoringRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/reports': {
       id: '/_authenticated/reports'
       path: '/reports'
@@ -389,6 +408,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFollowUpsRoute: typeof AuthenticatedFollowUpsRoute
   AuthenticatedInviteRoute: typeof AuthenticatedInviteRoute
   AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
+  AuthenticatedMonitoringRoute: typeof AuthenticatedMonitoringRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSeniorsNewRoute: typeof AuthenticatedSeniorsNewRoute
   AuthenticatedSeniorsIndexRoute: typeof AuthenticatedSeniorsIndexRoute
@@ -405,6 +425,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFollowUpsRoute: AuthenticatedFollowUpsRoute,
   AuthenticatedInviteRoute: AuthenticatedInviteRoute,
   AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,
+  AuthenticatedMonitoringRoute: AuthenticatedMonitoringRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSeniorsNewRoute: AuthenticatedSeniorsNewRoute,
   AuthenticatedSeniorsIndexRoute: AuthenticatedSeniorsIndexRoute,
