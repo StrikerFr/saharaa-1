@@ -19,24 +19,59 @@
 
 </div>
 
+## 📸 Platform Interface Showcase
+
+Below are authentic screenshots from the active Sahaara production workspace:
+
+### 1. ⌚ Live Health Monitoring & Fire-Boltt Legacy Telemetry (`/monitoring`)
+![Sahaara Live Health Monitoring & Fire-Boltt Legacy Telemetry](assets/readme/4.jpeg)
+*Real-time dashboard displaying connected Fire-Boltt Legacy smartwatch telemetry (BLE 5.2, 84% battery), 8 continuous biometric metric cards with trend sparklines, previous reading comparisons, and physiological status badges.*
+
+---
+
+### 2. 👤 Senior Care Profile & Health Intelligence Overview
+![Sahaara Senior Profile Overview](assets/readme/1.jpeg)
+*Comprehensive senior profile showing operational workload tiles, review status from the deterministic risk engine, unverified AI summary of the last 14 days, and unified navigation tabs including Live Health Monitoring.*
+
+---
+
+### 3. 💬 Ask Sahaara AI — Context-Grounded Conversational Care Assistant
+![Ask Sahaara AI Conversational Assistant](assets/readme/2.jpeg)
+*Interactive care assistant grounded in live verified records, answering coordinator queries regarding medication adherence, schedule progress, and pending daily tasks.*
+
+---
+
+### 4. 🩺 Latest Observations & Personalized Baseline Matrix
+![Latest Observations and Personalized Baselines](assets/readme/3.jpeg)
+*Transparent comparison of latest physiological and behavioral observations against individual senior baselines. Explicitly reinforces that baseline values represent personal reference points rather than assumed clinical normality.*
+
+---
+
+### 5. 📜 Chronological Observation History & Attributable Audit Log
+![Observation History and Audit Trail](assets/readme/5.jpeg)
+*Append-only chronological observation feed with delayed-entry tags, care team member attribution, and immutable audit timestamps.*
+
+---
+
 ## 📋 Table of Contents
 
-1. [Project Overview](#-project-overview)
-2. [Implementation & Architecture Status Matrix](#-implementation--architecture-status-matrix)
-3. [Technology Stack — 4-Layer Architecture](#-technology-stack--4-layer-architecture)
+1. [Platform Interface Showcase](#-platform-interface-showcase)
+2. [Project Overview](#-project-overview)
+3. [Implementation & Architecture Status Matrix](#-implementation--architecture-status-matrix)
+4. [Technology Stack — 4-Layer Architecture](#-technology-stack--4-layer-architecture)
    - [Layer 1: Capture and Communication](#layer-1-capture-and-communication)
    - [Layer 2: Local AI & Inference](#layer-2-local-ai--inference)
    - [Layer 3: Data and Synchronization](#layer-3-data-and-synchronization)
    - [Layer 4: Presentation and Processing](#layer-4-presentation-and-processing)
-4. [Wearable Health Monitoring & Smartwatch Integration (Fire-Boltt Legacy)](#-wearable-health-monitoring--smartwatch-integration)
-5. [AI Models & AI Architecture](#-ai-models--ai-architecture)
-6. [Complete System Architecture Diagrams](#-complete-system-architecture-diagrams)
-7. [Environment Variables Reference](#-environment-variables-reference)
-8. [Setup & Local Development Guide](#-setup--local-development-guide)
-9. [Repository Structure](#-repository-structure)
-10. [Care Safety & Clinical Guardrails](#-care-safety--clinical-guardrails)
-11. [Verification & Testing](#-verification--testing)
-12. [Deploying to Vercel](#-deploying-to-vercel)
+5. [Wearable Health Monitoring & Smartwatch Integration (Fire-Boltt Legacy)](#-wearable-health-monitoring--smartwatch-integration)
+6. [AI Models & AI Architecture](#-ai-models--ai-architecture)
+7. [Complete System Architecture Diagrams](#-complete-system-architecture-diagrams)
+8. [Environment Variables Reference](#-environment-variables-reference)
+9. [Setup & Local Development Guide](#-setup--local-development-guide)
+10. [Repository Structure](#-repository-structure)
+11. [Care Safety & Clinical Guardrails](#-care-safety--clinical-guardrails)
+12. [Verification & Testing](#-verification--testing)
+13. [Deploying to Vercel](#-deploying-to-vercel)
 
 ---
 
@@ -148,7 +183,7 @@ The Sahaara platform follows a modular 4-layer architecture separating data capt
 - **TanStack Start / Next.js + React 19 `[IMPLEMENTED]`:** 
   High-performance full-stack framework with React 19, strict TypeScript, and Vite/Nitro build pipelines deploying simultaneously to Vercel Build Output and Cloudflare Workers.
 - **Live Health Monitoring Dashboard `[IMPLEMENTED]`:** 
-  Real-time telemetry control center (`/monitoring`) with senior switching, live biometrics cards, hourly report timeline, and Recharts trends.
+  Real-time telemetry control center (`/monitoring`) with senior switching, live biometrics cards, hourly report timeline, and Recharts trends (see screenshot [4.jpeg](#1--live-health-monitoring--fire-boltt-legacy-telemetry-monitoring)).
 - **Workers and Scheduler `[IMPLEMENTED]`:** 
   Nitro serverless background tasks and cron endpoints manage scheduled medication reminders, overdue review escalation, and hourly report rollups.
 
@@ -248,7 +283,7 @@ Sahaara employs a hybrid AI architecture designed for low-latency triage, conver
 
 ### 2. Groq Cloud LLM `[IMPLEMENTED]`
 - **Active Service:** Serves as the primary production LLM engine in cloud deployments.
-- **Functions:** Powers two-way WhatsApp intent classification, senior profile wellbeing summaries, and conversational care Q&A.
+- **Functions:** Powers two-way WhatsApp intent classification, senior profile wellbeing summaries, and conversational care Q&A (see screenshot [2.jpeg](#3--ask-sahaara-ai--context-grounded-conversational-care-assistant)).
 - **Strict Fallback:** Includes deterministic rule-based routine parsing fallback if the external API reaches rate limits or network timeouts.
 
 ### 3. Whisper Speech-to-Text `[IMPLEMENTED]`
@@ -539,8 +574,13 @@ The application will launch at **`http://localhost:8080`**.
 ```
 saharaa-1/
 ├── assets/
-│   └── readme/                       # Project documentation visuals & smartwatch photos
-│       ├── fire-boltt-legacy.jpg     # Genuine Fire-Boltt Legacy front showcase
+│   └── readme/                       # Project documentation visuals & screenshots
+│       ├── 1.jpeg                    # Senior Profile & Care Overview
+│       ├── 2.jpeg                    # Ask Sahaara AI Conversational Assistant
+│       ├── 3.jpeg                    # Latest Observations & Baselines Matrix
+│       ├── 4.jpeg                    # Live Health Monitoring Dashboard (Fire-Boltt)
+│       ├── 5.jpeg                    # Observation History & Audit Log
+│       ├── fire-boltt-legacy.jpg     # Fire-Boltt Legacy front showcase
 │       └── fire-boltt-legacy-angle.jpg
 ├── docs/                             # Phase handoffs & audit specifications
 ├── public/                           # Static assets, webmanifest, robots.txt, sitemap
