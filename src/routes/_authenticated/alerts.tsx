@@ -821,6 +821,7 @@ function AlertItem({
               <Link
                 to="/seniors/$seniorId"
                 params={{ seniorId: r.seniorId }}
+                search={{ tab: "alerts" }}
                 className="text-base sm:text-lg font-bold text-foreground hover:text-primary transition-colors hover:underline tracking-tight"
               >
                 {r.seniorName}
@@ -837,9 +838,10 @@ function AlertItem({
             <Link
               to="/seniors/$seniorId"
               params={{ seniorId: r.seniorId }}
+              search={{ tab: "alerts" }}
               className="text-xs text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-1 font-medium"
             >
-              <span>Open senior health profile</span>
+              <span>Open clinical review case</span>
               <ArrowUpRight className="size-3" />
             </Link>
           </div>
@@ -882,20 +884,36 @@ function AlertItem({
               Reopen Alert
             </Button>
           )}
+
+          {/* Primary Action: Direct Review Case Navigation */}
           <Button
+            asChild
             size="sm"
-            className={cn(
-              "h-9 gap-1.5 text-xs font-semibold shadow-xs transition-all",
-              expanded
-                ? "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border"
-                : "bg-primary text-primary-foreground hover:bg-primary/90",
-            )}
+            className="h-9 gap-1.5 text-xs font-semibold shadow-xs bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <Link
+              to="/seniors/$seniorId"
+              params={{ seniorId: r.seniorId }}
+              search={{ tab: "alerts" }}
+            >
+              <Eye className="size-3.5" />
+              <span>Review Case</span>
+              <ArrowUpRight className="size-3 ml-0.5" />
+            </Link>
+          </Button>
+
+          {/* In-Place Telemetry & Evidence Quick Toggle */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 text-xs font-medium border-border/80"
             onClick={onToggle}
             aria-expanded={expanded}
             aria-controls={`alert-${r.caseId}`}
+            title="Inspect telemetry & evidence in-place"
           >
-            <Eye className="size-3.5" />
-            <span>{expanded ? "Collapse details" : "Review Case"}</span>
+            <Activity className="size-3.5 text-muted-foreground" />
+            <span className="hidden sm:inline">{expanded ? "Hide Evidence" : "Quick Evidence"}</span>
             <ChevronDown
               className={cn("size-3.5 transition-transform duration-200", expanded && "rotate-180")}
             />
@@ -992,9 +1010,21 @@ function AlertItem({
                 Clinical Evidence & Workflow Review
               </h4>
             </div>
-            <Button variant="ghost" size="sm" onClick={onToggle} className="h-7 text-xs">
-              Close
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button asChild size="sm" variant="default" className="h-7 text-xs gap-1 shadow-2xs">
+                <Link
+                  to="/seniors/$seniorId"
+                  params={{ seniorId: r.seniorId }}
+                  search={{ tab: "alerts" }}
+                >
+                  <span>Open Full Review Workspace</span>
+                  <ArrowUpRight className="size-3" />
+                </Link>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={onToggle} className="h-7 text-xs">
+                Close
+              </Button>
+            </div>
           </div>
           <CaseDetail caseId={r.caseId} timeZone={r.timeZone} />
           <AssessmentPanel seniorId={r.seniorId} timeZone={r.timeZone} />

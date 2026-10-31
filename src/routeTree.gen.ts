@@ -23,9 +23,11 @@ import { Route as AuthenticatedInviteRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
 import { Route as AuthenticatedMonitoringRouteImport } from './routes/_authenticated/monitoring'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedAlertsAlertIdRouteImport } from './routes/_authenticated/alerts.$alertId'
 import { Route as AuthenticatedSeniorsIndexRouteImport } from './routes/_authenticated/seniors.index'
 import { Route as AuthenticatedSeniorsNewRouteImport } from './routes/_authenticated/seniors.new'
 import { Route as AuthenticatedSeniorsSeniorIdIndexRouteImport } from './routes/_authenticated/seniors.$seniorId.index'
+import { Route as AuthenticatedSeniorsSeniorIdAlertsRouteImport } from './routes/_authenticated/seniors.$seniorId.alerts'
 import { Route as AuthenticatedSeniorsSeniorIdEditRouteImport } from './routes/_authenticated/seniors.$seniorId.edit'
 import { Route as AuthenticatedSeniorsSeniorIdReportsReportIdRouteImport } from './routes/_authenticated/seniors.$seniorId.reports.$reportId'
 
@@ -98,6 +100,12 @@ const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAlertsAlertIdRoute =
+  AuthenticatedAlertsAlertIdRouteImport.update({
+    id: '/$alertId',
+    path: '/$alertId',
+    getParentRoute: () => AuthenticatedAlertsRoute,
+  } as any)
 const AuthenticatedSeniorsIndexRoute =
   AuthenticatedSeniorsIndexRouteImport.update({
     id: '/seniors/',
@@ -113,6 +121,12 @@ const AuthenticatedSeniorsSeniorIdIndexRoute =
   AuthenticatedSeniorsSeniorIdIndexRouteImport.update({
     id: '/seniors/$seniorId/',
     path: '/seniors/$seniorId/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedSeniorsSeniorIdAlertsRoute =
+  AuthenticatedSeniorsSeniorIdAlertsRouteImport.update({
+    id: '/seniors/$seniorId/alerts',
+    path: '/seniors/$seniorId/alerts',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedSeniorsSeniorIdEditRoute =
@@ -135,15 +149,17 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/account': typeof AuthenticatedAccountRoute
   '/admin': typeof AuthenticatedAdminRoute
-  '/alerts': typeof AuthenticatedAlertsRoute
+  '/alerts': typeof AuthenticatedAlertsRouteWithChildren
   '/family': typeof AuthenticatedFamilyRoute
   '/follow-ups': typeof AuthenticatedFollowUpsRoute
   '/invite': typeof AuthenticatedInviteRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/monitoring': typeof AuthenticatedMonitoringRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/alerts/$alertId': typeof AuthenticatedAlertsAlertIdRoute
   '/seniors/new': typeof AuthenticatedSeniorsNewRoute
   '/seniors/': typeof AuthenticatedSeniorsIndexRoute
+  '/seniors/$seniorId/alerts': typeof AuthenticatedSeniorsSeniorIdAlertsRoute
   '/seniors/$seniorId/edit': typeof AuthenticatedSeniorsSeniorIdEditRoute
   '/seniors/$seniorId/': typeof AuthenticatedSeniorsSeniorIdIndexRoute
   '/seniors/$seniorId/reports/$reportId': typeof AuthenticatedSeniorsSeniorIdReportsReportIdRoute
@@ -155,15 +171,17 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/account': typeof AuthenticatedAccountRoute
   '/admin': typeof AuthenticatedAdminRoute
-  '/alerts': typeof AuthenticatedAlertsRoute
+  '/alerts': typeof AuthenticatedAlertsRouteWithChildren
   '/family': typeof AuthenticatedFamilyRoute
   '/follow-ups': typeof AuthenticatedFollowUpsRoute
   '/invite': typeof AuthenticatedInviteRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/monitoring': typeof AuthenticatedMonitoringRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/alerts/$alertId': typeof AuthenticatedAlertsAlertIdRoute
   '/seniors/new': typeof AuthenticatedSeniorsNewRoute
   '/seniors': typeof AuthenticatedSeniorsIndexRoute
+  '/seniors/$seniorId/alerts': typeof AuthenticatedSeniorsSeniorIdAlertsRoute
   '/seniors/$seniorId/edit': typeof AuthenticatedSeniorsSeniorIdEditRoute
   '/seniors/$seniorId': typeof AuthenticatedSeniorsSeniorIdIndexRoute
   '/seniors/$seniorId/reports/$reportId': typeof AuthenticatedSeniorsSeniorIdReportsReportIdRoute
@@ -177,15 +195,17 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/account': typeof AuthenticatedAccountRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
-  '/_authenticated/alerts': typeof AuthenticatedAlertsRoute
+  '/_authenticated/alerts': typeof AuthenticatedAlertsRouteWithChildren
   '/_authenticated/family': typeof AuthenticatedFamilyRoute
   '/_authenticated/follow-ups': typeof AuthenticatedFollowUpsRoute
   '/_authenticated/invite': typeof AuthenticatedInviteRoute
   '/_authenticated/messages': typeof AuthenticatedMessagesRoute
   '/_authenticated/monitoring': typeof AuthenticatedMonitoringRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/alerts/$alertId': typeof AuthenticatedAlertsAlertIdRoute
   '/_authenticated/seniors/new': typeof AuthenticatedSeniorsNewRoute
   '/_authenticated/seniors/': typeof AuthenticatedSeniorsIndexRoute
+  '/_authenticated/seniors/$seniorId/alerts': typeof AuthenticatedSeniorsSeniorIdAlertsRoute
   '/_authenticated/seniors/$seniorId/edit': typeof AuthenticatedSeniorsSeniorIdEditRoute
   '/_authenticated/seniors/$seniorId/': typeof AuthenticatedSeniorsSeniorIdIndexRoute
   '/_authenticated/seniors/$seniorId/reports/$reportId': typeof AuthenticatedSeniorsSeniorIdReportsReportIdRoute
@@ -206,8 +226,10 @@ export interface FileRouteTypes {
     | '/messages'
     | '/monitoring'
     | '/reports'
+    | '/alerts/$alertId'
     | '/seniors/new'
     | '/seniors/'
+    | '/seniors/$seniorId/alerts'
     | '/seniors/$seniorId/edit'
     | '/seniors/$seniorId/'
     | '/seniors/$seniorId/reports/$reportId'
@@ -226,8 +248,10 @@ export interface FileRouteTypes {
     | '/messages'
     | '/monitoring'
     | '/reports'
+    | '/alerts/$alertId'
     | '/seniors/new'
     | '/seniors'
+    | '/seniors/$seniorId/alerts'
     | '/seniors/$seniorId/edit'
     | '/seniors/$seniorId'
     | '/seniors/$seniorId/reports/$reportId'
@@ -247,8 +271,10 @@ export interface FileRouteTypes {
     | '/_authenticated/messages'
     | '/_authenticated/monitoring'
     | '/_authenticated/reports'
+    | '/_authenticated/alerts/$alertId'
     | '/_authenticated/seniors/new'
     | '/_authenticated/seniors/'
+    | '/_authenticated/seniors/$seniorId/alerts'
     | '/_authenticated/seniors/$seniorId/edit'
     | '/_authenticated/seniors/$seniorId/'
     | '/_authenticated/seniors/$seniorId/reports/$reportId'
@@ -362,6 +388,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReportsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/alerts/$alertId': {
+      id: '/_authenticated/alerts/$alertId'
+      path: '/$alertId'
+      fullPath: '/alerts/$alertId'
+      preLoaderRoute: typeof AuthenticatedAlertsAlertIdRouteImport
+      parentRoute: typeof AuthenticatedAlertsRoute
+    }
     '/_authenticated/seniors/': {
       id: '/_authenticated/seniors/'
       path: '/seniors'
@@ -383,6 +416,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSeniorsSeniorIdIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/seniors/$seniorId/alerts': {
+      id: '/_authenticated/seniors/$seniorId/alerts'
+      path: '/seniors/$seniorId/alerts'
+      fullPath: '/seniors/$seniorId/alerts'
+      preLoaderRoute: typeof AuthenticatedSeniorsSeniorIdAlertsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/seniors/$seniorId/edit': {
       id: '/_authenticated/seniors/$seniorId/edit'
       path: '/seniors/$seniorId/edit'
@@ -400,10 +440,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedAlertsRouteChildren {
+  AuthenticatedAlertsAlertIdRoute: typeof AuthenticatedAlertsAlertIdRoute
+}
+
+const AuthenticatedAlertsRouteChildren: AuthenticatedAlertsRouteChildren = {
+  AuthenticatedAlertsAlertIdRoute: AuthenticatedAlertsAlertIdRoute,
+}
+
+const AuthenticatedAlertsRouteWithChildren =
+  AuthenticatedAlertsRoute._addFileChildren(AuthenticatedAlertsRouteChildren)
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccountRoute: typeof AuthenticatedAccountRoute
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
-  AuthenticatedAlertsRoute: typeof AuthenticatedAlertsRoute
+  AuthenticatedAlertsRoute: typeof AuthenticatedAlertsRouteWithChildren
   AuthenticatedFamilyRoute: typeof AuthenticatedFamilyRoute
   AuthenticatedFollowUpsRoute: typeof AuthenticatedFollowUpsRoute
   AuthenticatedInviteRoute: typeof AuthenticatedInviteRoute
@@ -412,6 +463,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSeniorsNewRoute: typeof AuthenticatedSeniorsNewRoute
   AuthenticatedSeniorsIndexRoute: typeof AuthenticatedSeniorsIndexRoute
+  AuthenticatedSeniorsSeniorIdAlertsRoute: typeof AuthenticatedSeniorsSeniorIdAlertsRoute
   AuthenticatedSeniorsSeniorIdEditRoute: typeof AuthenticatedSeniorsSeniorIdEditRoute
   AuthenticatedSeniorsSeniorIdIndexRoute: typeof AuthenticatedSeniorsSeniorIdIndexRoute
   AuthenticatedSeniorsSeniorIdReportsReportIdRoute: typeof AuthenticatedSeniorsSeniorIdReportsReportIdRoute
@@ -420,7 +472,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccountRoute: AuthenticatedAccountRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
-  AuthenticatedAlertsRoute: AuthenticatedAlertsRoute,
+  AuthenticatedAlertsRoute: AuthenticatedAlertsRouteWithChildren,
   AuthenticatedFamilyRoute: AuthenticatedFamilyRoute,
   AuthenticatedFollowUpsRoute: AuthenticatedFollowUpsRoute,
   AuthenticatedInviteRoute: AuthenticatedInviteRoute,
@@ -429,6 +481,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSeniorsNewRoute: AuthenticatedSeniorsNewRoute,
   AuthenticatedSeniorsIndexRoute: AuthenticatedSeniorsIndexRoute,
+  AuthenticatedSeniorsSeniorIdAlertsRoute:
+    AuthenticatedSeniorsSeniorIdAlertsRoute,
   AuthenticatedSeniorsSeniorIdEditRoute: AuthenticatedSeniorsSeniorIdEditRoute,
   AuthenticatedSeniorsSeniorIdIndexRoute:
     AuthenticatedSeniorsSeniorIdIndexRoute,

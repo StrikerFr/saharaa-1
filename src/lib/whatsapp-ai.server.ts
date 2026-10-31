@@ -136,14 +136,13 @@ export async function classifyInboundWhatsAppIntent(
   injectedConfig?: GroqConfig,
   fetchImpl: typeof fetch = fetch,
 ): Promise<WhatsAppIntentResult> {
-  const cfg = injectedConfig ?? groqConfig();
-
   // Fast heuristic for emergency keywords before calling LLM
   const lower = text.toLowerCase();
   const emergencyKeywords = ["heart attack", "behosh", "chest pain", "cannot breathe", "choking", "unconscious"];
   const immediateEmergency = emergencyKeywords.some((k) => lower.includes(k));
 
   try {
+    const cfg = injectedConfig ?? groqConfig();
     const res = await fetchImpl(`${GROQ_BASE}/chat/completions`, {
       method: "POST",
       headers: {

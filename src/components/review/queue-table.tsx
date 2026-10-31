@@ -251,6 +251,7 @@ export function QueueTable() {
                   <Link
                     to="/seniors/$seniorId"
                     params={{ seniorId: r.seniorId }}
+                    search={{ tab: "alerts" }}
                     className="group relative flex flex-col gap-3.5 rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-all duration-200 hover:border-primary/50 hover:bg-card/90 hover:shadow-md focus-visible:outline-2 focus-visible:outline-ring"
                   >
                     {/* Header: Senior Identity + Badges + Action */}

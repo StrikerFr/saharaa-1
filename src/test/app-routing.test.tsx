@@ -14,4 +14,29 @@ describe("App routing", () => {
 
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
   });
+
+  it("matches senior profile with and without trailing slash", () => {
+    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+
+    const withSlash = router.matchRoutes("/seniors/11111111-1111-1111-1111-111111111111/");
+    const withoutSlash = router.matchRoutes("/seniors/11111111-1111-1111-1111-111111111111");
+
+    console.log("withSlash matches:", withSlash.map(m => m.routeId));
+    console.log("withoutSlash matches:", withoutSlash.map(m => m.routeId));
+
+    expect(withSlash.at(-1)?.routeId).toBe("/_authenticated/seniors/$seniorId/");
+    expect(withoutSlash.at(-1)?.routeId).toBe("/_authenticated/seniors/$seniorId/");
+  });
+
+  it("matches alerts directory and deep alert routes without falling back to not found", () => {
+    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+
+    const alertsMatch = router.matchRoutes("/alerts");
+    const deepAlertMatch = router.matchRoutes("/alerts/a6ea209e-fa00-4d6c-ba40-50631a825364");
+    const seniorAlertsMatch = router.matchRoutes("/seniors/f04d791b-755d-5b24-8776-a62354e4de37/alerts");
+
+    expect(alertsMatch.at(-1)?.routeId).not.toBe(rootRouteId);
+    expect(deepAlertMatch.at(-1)?.routeId).toBe("/_authenticated/alerts/$alertId");
+    expect(seniorAlertsMatch.at(-1)?.routeId).toBe("/_authenticated/seniors/$seniorId/alerts");
+  });
 });

@@ -160,7 +160,7 @@ describe("Phase: WhatsApp Dynamic Outbound Messaging & Groq AI", () => {
     });
 
     it("rejects empty or whitespace-only messages", async () => {
-      expect(
+      await expect(
         sendOutboundWhatsAppMessage(
           {
             userId,
