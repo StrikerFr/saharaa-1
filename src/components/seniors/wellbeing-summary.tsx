@@ -81,10 +81,10 @@ export function WellbeingSummary({
               <p className="text-sm text-muted-foreground">{p.help}</p>
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
                 <dt className="text-muted-foreground">Data</dt>
-                <dd>{QUALITY_LABEL[a.data_quality]}</dd>
+                <dd>{QUALITY_LABEL[a.data_quality] ?? a.data_quality}</dd>
                 <dt className="text-muted-foreground">Changes in</dt>
                 <dd>
-                  {a.changed_domains.length
+                  {(a.changed_domains ?? []).length
                     ? a.changed_domains.map((d) => DOMAIN_LABEL[d] ?? d).join(", ")
                     : "None found in evaluated rules"}
                 </dd>

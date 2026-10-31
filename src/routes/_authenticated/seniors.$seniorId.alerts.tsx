@@ -15,3 +15,4 @@ export const Route = createFileRoute("/_authenticated/seniors/$seniorId/alerts")
   },
   component: () => null,
 });
+

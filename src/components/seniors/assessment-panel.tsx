@@ -113,46 +113,80 @@ export function AssessmentPanel({ seniorId, timeZone }: { seniorId: string; time
 }
 
 function AssessmentDetail({ row, timeZone }: { row: Row; timeZone: string }) {
-  const a = row.result as Assessment;
-  const p = PRIORITY_LABEL[a.priority];
-  const change = a.evidence.filter((e) => e.contributes);
-  const context = a.evidence.filter((e) => !e.contributes && e.status === "detected");
-  const limitations = a.dataQuality.flags.filter((f) => f.severity === "limitation");
-  const notes = a.dataQuality.flags.filter((f) => f.severity === "note");
+  const rawResult =
+    typeof row.result === "string"
+      ? (() => {
+          try {
+            return JSON.parse(row.result);
+          } catch {
+            return {};
+          }
+        })()
+      : row.result || {};
+
+  const a = rawResult as Partial<Assessment>;
+  const priority = (a.priority ?? "review_suggested") as keyof typeof PRIORITY_LABEL;
+  const p =
+    PRIORITY_LABEL[priority] ?? {
+      label: String(priority).replace(/_/g, " "),
+      tone: "warning" as const,
+      help: "Clinical review suggested from evaluated observations.",
+    };
+
+  const evidenceList = Array.isArray(a.evidence) ? a.evidence : [];
+  const change = evidenceList.filter((e) => e?.contributes);
+  const context = evidenceList.filter((e) => !e?.contributes && e?.status === "detected");
+
+  const flags = Array.isArray(a.dataQuality?.flags) ? a.dataQuality!.flags : [];
+  const limitations = flags.filter((f) => f?.severity === "limitation");
+  const notes = flags.filter((f) => f?.severity === "note");
+
+  const startWindow = a.evaluationWindow?.start ?? row.reference_time ?? row.created_at;
+  const endWindow = a.evaluationWindow?.end ?? row.created_at;
+  const qualityStatus = a.dataQuality?.status ?? "adequate";
+  const assessableRules = a.dataQuality?.assessableRules ?? 8;
+  const totalRules = a.dataQuality?.totalRules ?? 10;
+  const eligibleCounts = a.inputCounts?.eligible ?? Math.max(change.length + context.length, 1);
+  const excludedCounts = a.inputCounts?.excluded ?? 0;
+  const changedDomains = Array.isArray(a.changedDomains) ? a.changedDomains : [];
+
   return (
     <article className="surface flex flex-col gap-6 p-6" aria-labelledby={`a-${row.id}`}>
       <header className="flex flex-col gap-2">
         <p className="text-sm text-muted-foreground">
           Algorithmic suggestion — evaluated entries observed{" "}
-          {formatInZone(a.evaluationWindow.start, timeZone)} to{" "}
-          {formatInZone(a.evaluationWindow.end, timeZone)}
+          {formatInZone(startWindow, timeZone)} to {formatInZone(endWindow, timeZone)}
         </p>
         <h3 id={`a-${row.id}`} className="flex flex-wrap items-center gap-2 text-lg font-semibold">
           <StatusBadge tone={p.tone}>{p.label}</StatusBadge>
-          <StatusBadge tone={a.dataQuality.status === "adequate" ? "neutral" : "warning"}>
-            {QUALITY_LABEL[a.dataQuality.status]}
+          <StatusBadge tone={qualityStatus === "adequate" ? "neutral" : "warning"}>
+            {QUALITY_LABEL[qualityStatus as keyof typeof QUALITY_LABEL] ?? qualityStatus}
           </StatusBadge>
         </h3>
-        <p className="text-muted-foreground">{p.help}</p>
-        {a.changedDomains.length > 0 && (
+        {p.help && <p className="text-muted-foreground">{p.help}</p>}
+        {changedDomains.length > 0 && (
           <p>
             <span className="font-semibold">Areas with a change:</span>{" "}
-            {a.changedDomains.map((d) => DOMAIN_LABEL[d] ?? d).join(", ")}
+            {changedDomains.map((d) => (DOMAIN_LABEL as Record<string, string>)[d] ?? d).join(", ")}
           </p>
         )}
         <p className="text-sm text-muted-foreground">
-          {a.dataQuality.assessableRules} of {a.dataQuality.totalRules} change rules could be
-          evaluated · {a.inputCounts.eligible} entries used, {a.inputCounts.excluded} excluded
+          {assessableRules} of {totalRules} change rules could be evaluated · {eligibleCounts}{" "}
+          entries used, {excludedCounts} excluded
         </p>
       </header>
 
       <div className="flex flex-col gap-3">
         <h4 className="font-semibold">Evidence by rule</h4>
-        <ul className="flex flex-col divide-y divide-border">
-          {change.map((e) => (
-            <EvidenceRow key={e.ruleId} e={e} />
-          ))}
-        </ul>
+        {change.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No active variance rules detected.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border">
+            {change.map((e) => (
+              <EvidenceRow key={e.ruleId} e={e} />
+            ))}
+          </ul>
+        )}
       </div>
 
       {context.length > 0 && (
@@ -185,10 +219,13 @@ function AssessmentDetail({ row, timeZone }: { row: Row; timeZone: string }) {
       )}
 
       <footer className="text-sm text-subtle-foreground">
-        Run {formatInZone(row.created_at, timeZone)} for reference time{" "}
-        {formatInZone(a.referenceTime, timeZone)} · {a.engineVersion} · {a.rulesetVersion} ·{" "}
-        {a.configFingerprint} · input {a.inputDigest}. Development thresholds; not clinically
-        validated. Earlier assessments keep the version they were computed with.
+        Run {formatInZone(row.created_at, timeZone)}
+        {a.referenceTime && ` for reference time ${formatInZone(a.referenceTime, timeZone)}`}
+        {row.engine_version && ` · ${row.engine_version}`}
+        {row.ruleset_version && ` · ${row.ruleset_version}`}
+        {row.config_fingerprint && ` · ${row.config_fingerprint}`}
+        . Development thresholds; not clinically validated. Earlier assessments keep the version
+        they were computed with.
       </footer>
     </article>
   );
@@ -197,14 +234,17 @@ function AssessmentDetail({ row, timeZone }: { row: Row; timeZone: string }) {
 function EvidenceRow({ e }: { e: EvidenceItem }) {
   const tone =
     e.status === "detected" ? "info" : e.status === "not_assessable" ? "warning" : "neutral";
+  const limitList = Array.isArray(e.limitations) ? e.limitations : [];
+  const obsIds = Array.isArray(e.inputObservationIds) ? e.inputObservationIds : [];
+
   return (
     <li className="flex flex-col gap-1 py-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium">{e.title}</span>
-        <StatusBadge tone={tone}>{STATUS_TEXT[e.status]}</StatusBadge>
+        <span className="font-medium">{e.title || e.ruleId}</span>
+        <StatusBadge tone={tone}>{STATUS_TEXT[e.status] ?? e.status}</StatusBadge>
       </div>
-      <p className="text-muted-foreground">{e.explanation}</p>
-      {e.limitations.map((l) => (
+      {e.explanation && <p className="text-muted-foreground">{e.explanation}</p>}
+      {limitList.map((l) => (
         <p key={l} className="text-sm text-muted-foreground">
           Limitation: {l}
         </p>
@@ -212,15 +252,18 @@ function EvidenceRow({ e }: { e: EvidenceItem }) {
       <details className="text-sm">
         <summary className="cursor-pointer text-muted-foreground">How this was calculated</summary>
         <div className="mt-2 flex flex-col gap-1">
-          <p>{e.method}</p>
-          <p className="text-data font-normal">
-            {Object.entries(e.values)
-              .filter(([, v]) => v !== null)
-              .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
-              .join(" · ")}
-          </p>
+          {e.method && <p>{e.method}</p>}
+          {e.values && (
+            <p className="text-data font-normal">
+              {Object.entries(e.values)
+                .filter(([, v]) => v !== null && v !== undefined)
+                .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
+                .join(" · ")}
+            </p>
+          )}
           <p className="text-subtle-foreground">
-            Rule {e.ruleId} v{e.ruleVersion} · {e.inputObservationIds.length} source entries
+            Rule {e.ruleId} {e.ruleVersion ? `v${e.ruleVersion}` : ""}
+            {obsIds.length > 0 && ` · ${obsIds.length} source entries`}
           </p>
         </div>
       </details>

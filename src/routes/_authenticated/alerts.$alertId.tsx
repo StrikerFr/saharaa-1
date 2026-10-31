@@ -45,3 +45,4 @@ export const Route = createFileRoute("/_authenticated/alerts/$alertId")({
   },
   component: () => null,
 });
+

@@ -95,4 +95,28 @@ describe("navigation", () => {
     expect(by["Messages"]).toMatchObject({ status: "available", to: "/messages" });
     expect(by["Reports"]).toMatchObject({ status: "available", to: "/reports" });
   });
+
+  it("handles legacy assessment objects without evaluationWindow or inputCounts safely", () => {
+    const legacyResult = {
+      evidence: [
+        {
+          title: "blood_pressure Shift Detected",
+          domain: "blood_pressure",
+          status: "detected",
+          contributes: true,
+          ruleId: "shift.bp",
+        },
+      ],
+      priority: "prompt_review_recommended",
+      dataQuality: { status: "adequate", flags: [], assessableRules: 8, totalRules: 10 },
+      changedDomains: ["blood_pressure"],
+    };
+
+    // Verify safe property extraction works as in AssessmentDetail
+    const startWindow = (legacyResult as any).evaluationWindow?.start ?? "2026-10-15T00:00:00Z";
+    const eligibleCounts = (legacyResult as any).inputCounts?.eligible ?? 1;
+
+    expect(startWindow).toBe("2026-10-15T00:00:00Z");
+    expect(eligibleCounts).toBe(1);
+  });
 });

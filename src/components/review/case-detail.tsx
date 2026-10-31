@@ -49,9 +49,18 @@ export function CaseDetail({ caseId, timeZone }: { caseId: string; timeZone: str
       </div>
     );
 
-  const { case: c, assessment, superseded, events, tasks } = query.data;
-  const cs = CASE_STATUS_LABEL[c.status];
+  if (!query.data || !query.data.case) {
+    return <Notice tone="critical" title="Couldn't load the review case details." />;
+  }
+
+  const { case: c, assessment, superseded, events = [], tasks = [] } = query.data;
+  const cs = CASE_STATUS_LABEL[c.status] ?? { label: c.status, tone: "neutral" as const };
   const stale = assessment ? isAssessmentStale(assessment.created_at) : false;
+  const priorityMeta =
+    PRIORITY_LABEL[c.priority_at_open] ?? {
+      label: String(c.priority_at_open).replace(/_/g, " "),
+      tone: "neutral" as const,
+    };
 
   return (
     <Section
@@ -62,8 +71,8 @@ export function CaseDetail({ caseId, timeZone }: { caseId: string; timeZone: str
         <header className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge tone={cs.tone}>{cs.label}</StatusBadge>
-            <StatusBadge tone={PRIORITY_LABEL[c.priority_at_open].tone}>
-              Opened as: {PRIORITY_LABEL[c.priority_at_open].label}
+            <StatusBadge tone={priorityMeta.tone}>
+              Opened as: {priorityMeta.label}
             </StatusBadge>
             {stale && <StatusBadge tone="warning">Assessment over 7 days old</StatusBadge>}
             {superseded && <StatusBadge tone="warning">A newer assessment exists</StatusBadge>}

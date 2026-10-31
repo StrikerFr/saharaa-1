@@ -142,7 +142,16 @@ async function seedAlerts() {
 
     // 2. Insert Risk Assessment
     const assessmentResult = {
+      schemaVersion: 1,
       seniorId: item.seniorId,
+      evaluationWindow: {
+        start: new Date(Date.now() - 14 * 86400000).toISOString(),
+        end: new Date().toISOString(),
+      },
+      inputCounts: {
+        eligible: Math.max(item.observations.length, 4),
+        excluded: 0,
+      },
       priority: item.priority,
       changedDomains: item.changedDomains,
       referenceTime: new Date().toISOString(),
